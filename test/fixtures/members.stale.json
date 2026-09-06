@@ -1,14 +1,14 @@
 [
   {
-    "user_id": "00000000-0000-4000-8000-000000000006",
-    "nickname": "Olga",
+    "user_id": "00000000-0000-4000-8000-6af49596aa13",
+    "nickname": "Newman",
     "inside": true,
     "current_area": {
-      "id": "00000000-0000-4000-8000-0000000000b1",
+      "id": "00000000-0000-4000-8000-8dd8d8268acd",
       "name": "Skatepark"
     },
-    "last_update": "2026-09-05T14:02:44.001Z",
+    "last_update": "2026-09-06T11:10:01.609468Z",
     "safety_status": "stale",
-    "position_age_seconds": 2710
+    "position_age_seconds": 3003
   }
 ]

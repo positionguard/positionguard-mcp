@@ -1,9 +1,10 @@
 [
   {
-    "user_id": "00000000-0000-4000-8000-000000000002",
-    "nickname": "Fred",
+    "user_id": "00000000-0000-4000-8000-6af49596aa13",
+    "nickname": "Newman",
     "inside": false,
-    "safety_status": "out_of_zone",
-    "position_age_seconds": 121
+    "safety_status": "at_area",
+    "safety_area": "Skatepark",
+    "position_age_seconds": 2116
   }
 ]

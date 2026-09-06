@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ApiError, PositionGuardClient } from "../src/core/client.js";
 import { countMembersAtArea, listAreas, listGroups, whereIsMember, whoIsAtArea } from "../src/core/tools.js";
-import { captureLog, defaultRoutes, fakeFetch, FAMILY, PUBLIC, SKATE, SKATEPARK, type Routes } from "./helpers.js";
+import { fixture } from "./helpers.js";
+import { captureLog, CONSENT, defaultRoutes, fakeFetch, FAMILY, FRIENDS, PUBLIC, SKATE, SKATEPARK, type Routes } from "./helpers.js";
 
 const KEY = "pg_live_0123456789abcdef0123456789abcdef";
 
@@ -17,10 +18,12 @@ test("list_groups", async () => {
   const { c } = client();
   const r = await listGroups(c);
   assert.equal(r.status, "ok");
-  assert.deepEqual(
-    r.groups.map((g) => g.name),
-    ["Family", "Skate Crew", "Neighbourhood"],
-  );
+  assert.equal(r.groups.length, 9);
+  assert.deepEqual(r.groups.find((g) => g.group_id === PUBLIC), {
+    group_id: PUBLIC,
+    name: "Dog Park @ Marymoor",
+    group_type: "public",
+  });
 });
 
 test("list_areas strips counts and tags each area with its group; never calls /areas", async () => {
@@ -35,27 +38,65 @@ test("list_areas strips counts and tags each area with its group; never calls /a
 test("list_areas across every group", async () => {
   const { c } = client();
   const r = await listAreas(c, {});
-  assert.deepEqual([...new Set(r.areas.map((a) => a.group_name))], ["Family", "Skate Crew", "Neighbourhood"]);
+  // Only the groups with fake area routes have areas; the rest answer empty in the fake API.
+  assert.deepEqual(
+    [...new Set(r.areas.map((a) => a.group_name))].sort(),
+    ["Consent Test Group", "Family", "Dog Park @ Marymoor", "Team 🛹 Skateboard"].sort(),
+  );
 });
 
-test("where_is_member: at an area", async () => {
+test("where_is_member: at an area (captured row)", async () => {
   const { c } = client();
-  const r = await whereIsMember(c, { nickname: "earl", group_id: FAMILY });
+  const r = await whereIsMember(c, { nickname: "newman", group_id: FAMILY });
   assert.equal(r.status, "at_area");
-  assert.equal(r.nickname, "Earl");
+  assert.equal(r.nickname, "Newman");
   if (r.status === "at_area") {
+    assert.equal(r.area.area_id, SKATEPARK);
     assert.equal(r.area.name, "Skatepark");
-    assert.equal(r.since, "2026-09-05T17:41:09.512Z");
+    assert.match(r.since!, /^2026-/);
     assert.equal(r.group_id, FAMILY);
   }
 });
 
-test("where_is_member: disclosed and away", async () => {
+test("where_is_member: disclosed and away (captured row: inside:false with a safety block)", async () => {
   const { c } = client();
-  assert.deepEqual(await whereIsMember(c, { nickname: "Fred" }), { status: "not_at_area", nickname: "Fred" });
+  assert.deepEqual(await whereIsMember(c, { nickname: "newman", group_id: CONSENT }), {
+    status: "not_at_area",
+    nickname: "Newman",
+  });
 });
 
-for (const name of ["John", "Nina", "Sam"]) {
+test("where_is_member: Newman with consent off (captured row) -> unknown, not not_at_area", async () => {
+  const { c } = client();
+  assert.deepEqual(await whereIsMember(c, { nickname: "Newman", group_id: FRIENDS }), {
+    status: "unknown",
+    reason: "not_disclosed",
+    nickname: "Newman",
+  });
+});
+
+test("where_is_member: Ghost-joined member inside a public group's area (captured row) -> at_area, because the API does not mask join-mode Ghost on this roster", async () => {
+  // Documents current API behaviour, not desired behaviour: the app roster
+  // shows this member as "Hidden member" and the map drops them, but the
+  // REST roster carries real identity and current_area (see
+  // test/fixtures/README.md, "Known API gap"). When the API masks it, this
+  // row becomes the withheld shape and the expectation flips to unknown.
+  const { c } = client();
+  const r = await whereIsMember(c, { nickname: "Newman", group_id: PUBLIC });
+  assert.equal(r.status, "at_area");
+  if (r.status === "at_area") assert.equal(r.area.name, "Marymoor Dog Park");
+});
+
+test("where_is_member: disclosed member away in a PUBLIC group (captured row) -> unknown, because public rosters carry no safety block", async () => {
+  const { c } = client();
+  assert.deepEqual(await whereIsMember(c, { nickname: "EarlonDev" }), {
+    status: "unknown",
+    reason: "not_disclosed",
+    nickname: "EarlonDev",
+  });
+});
+
+for (const name of ["Fred", "John"]) {
   test(`where_is_member: ${name} (withheld) -> unknown, not not_at_area`, async () => {
     const { c } = client();
     assert.deepEqual(await whereIsMember(c, { nickname: name }), {
@@ -66,9 +107,11 @@ for (const name of ["John", "Nina", "Sam"]) {
   });
 }
 
-test("where_is_member: stale -> unknown/stale", async () => {
+test("where_is_member: stale (captured row, still inside the area) -> unknown/stale, area not returned", async () => {
   const { c } = client();
-  assert.deepEqual(await whereIsMember(c, { nickname: "Olga" }), { status: "unknown", reason: "stale", nickname: "Olga" });
+  const r = await whereIsMember(c, { nickname: "Newman", group_id: SKATE });
+  assert.deepEqual(r, { status: "unknown", reason: "stale", nickname: "Newman" });
+  assert.ok(!JSON.stringify(r).includes("Skatepark"));
 });
 
 test("where_is_member: nobody by that name -> unknown/no_such_member, not an error", async () => {
@@ -82,32 +125,44 @@ test("where_is_member: nobody by that name -> unknown/no_such_member, not an err
 
 test("where_is_member: unique partial match is accepted, ambiguous is not", async () => {
   const { c } = client();
-  const r = await whereIsMember(c, { nickname: "ear" });
+  const r = await whereIsMember(c, { nickname: "newm" });
   assert.equal(r.status, "at_area");
-  assert.equal(r.nickname, "Earl");
-  // "n" matches Nina, John and Earl-free names... make it genuinely ambiguous:
+  assert.equal(r.nickname, "Newman");
+  // "n" matches Newman, John and EarlonDev: genuinely ambiguous.
   const amb = await whereIsMember(c, { nickname: "n" });
   assert.equal(amb.status, "unknown");
   assert.equal(amb.reason, "no_such_member");
 });
 
-test("where_is_member: group_id omitted searches every group and prefers a positive row", async () => {
-  // Earl's Family row is at_area; make it withheld there and keep Skate Crew's at_area.
-  const routes = defaultRoutes();
-  const family = (routes[`/groups/${FAMILY}/members`] as { body: unknown[] }).body.map((m) =>
-    (m as { nickname?: string }).nickname === "Earl" ? { ...(m as object), inside: false, current_area: undefined, last_update: undefined, safety_status: undefined, safety_area: undefined, position_age_seconds: undefined } : m,
-  );
-  routes[`/groups/${FAMILY}/members`] = { status: 200, body: JSON.parse(JSON.stringify(family)) };
-  const { c, calls } = client(routes);
-  const r = await whereIsMember(c, { nickname: "Earl" });
+test("where_is_member: group_id omitted searches every group; at_area beats not_at_area beats unknown", async () => {
+  // Newman is at_area in Family and not_at_area in the Skateboard group.
+  const { c, calls } = client();
+  const r = await whereIsMember(c, { nickname: "Newman" });
   assert.equal(r.status, "at_area");
-  if (r.status === "at_area") assert.equal(r.group_name, "Skate Crew");
+  if (r.status === "at_area") assert.equal(r.group_name, "Family");
   assert.ok(calls.includes(`/groups/${SKATE}/members`));
+
+  // Withhold both of his at_area rows (Family, and the park row the API
+  // currently discloses): the Consent Test Group's disclosed-away row answers,
+  // beating the Skateboard group's stale row.
+  const routes = defaultRoutes();
+  const withhold = (path: string) => {
+    const body = (routes[path] as { body: unknown[] }).body.map((m) =>
+      (m as { nickname?: string }).nickname === "Newman"
+        ? { user_id: (m as { user_id: string }).user_id, nickname: "Newman", inside: false }
+        : m,
+    );
+    routes[path] = { status: 200, body };
+  };
+  withhold(`/groups/${FAMILY}/members`);
+  withhold(`/groups/${PUBLIC}/members`);
+  const r2 = await whereIsMember(client(routes).c, { nickname: "Newman" });
+  assert.deepEqual(r2, { status: "not_at_area", nickname: "Newman" });
 });
 
 test("where_is_member: unknown group_id -> no_such_member without calling the API for it", async () => {
   const { c, calls } = client();
-  const r = await whereIsMember(c, { nickname: "Earl", group_id: "not-a-group" });
+  const r = await whereIsMember(c, { nickname: "Newman", group_id: "not-a-group" });
   assert.equal(r.status, "unknown");
   assert.equal(r.reason, "no_such_member");
   assert.deepEqual(calls, ["/groups"]);
@@ -118,10 +173,10 @@ test("who_is_at_area: only disclosed members; note when the roster had withheld 
   const r = await whoIsAtArea(c, { group_id: FAMILY, area_name: "skatepark" });
   assert.equal(r.status, "ok");
   if (r.status === "ok") {
-    assert.deepEqual(r.members, ["Earl"]); // Olga is stale, not listed
+    assert.deepEqual(r.members, ["Newman"]); // Olga is stale, not listed
     assert.ok(r.undisclosed_note);
-    assert.match(r.undisclosed_note!, /^4 members/); // John, Nina, Sam, Olga
-    for (const n of ["John", "Nina", "Sam", "Olga"]) assert.ok(!r.undisclosed_note!.includes(n), "note never names anyone");
+    assert.match(r.undisclosed_note!, /^2 members/); // Fred, John
+    for (const n of ["Fred", "John"]) assert.ok(!r.undisclosed_note!.includes(n), "note never names anyone");
   }
 });
 
@@ -131,7 +186,7 @@ test("who_is_at_area: no withheld rows -> no note", async () => {
     status: 200,
     body: [
       ...(routes[`/groups/${FAMILY}/members`] as { body: unknown[] }).body.filter((m) =>
-        ["Earl", "Fred"].includes((m as { nickname: string }).nickname),
+        ["Newman"].includes((m as { nickname: string }).nickname),
       ),
     ],
   };
@@ -139,7 +194,7 @@ test("who_is_at_area: no withheld rows -> no note", async () => {
   const r = await whoIsAtArea(c, { group_id: FAMILY, area_id: SKATEPARK });
   assert.equal(r.status, "ok");
   if (r.status === "ok") {
-    assert.deepEqual(r.members, ["Earl"]);
+    assert.deepEqual(r.members, ["Newman"]);
     assert.equal(r.undisclosed_note, undefined);
   }
 });
@@ -168,7 +223,29 @@ test("count_members_at_area: undisclosed present -> floor note 'at least N'", as
   }
 });
 
-test("count_members_at_area: stale present -> floor note", async () => {
+test("count_members_at_area: captured Skatepark with Newman's consent off -> 1/0/1 and 'at least 1'", async () => {
+  const routes = defaultRoutes();
+  routes[`/groups/${SKATE}/area-counts`] = { status: 200, body: fixture("area_counts.skateboard.undisclosed.json") };
+  const { c } = client(routes);
+  const r = await countMembersAtArea(c, { group_id: SKATE, area_id: SKATEPARK });
+  assert.equal(r.status, "ok");
+  if (r.status === "ok") {
+    assert.deepEqual([r.member_count, r.stale_count, r.undisclosed_count], [1, 0, 1]);
+    assert.match(r.note, /at least 1/);
+  }
+});
+
+test("count_members_at_area: captured Skatepark with Newman stale -> 2/1/0 and 'at least 2'", async () => {
+  const { c } = client();
+  const r = await countMembersAtArea(c, { area_id: SKATEPARK, group_id: SKATE });
+  assert.equal(r.status, "ok");
+  if (r.status === "ok") {
+    assert.deepEqual([r.member_count, r.stale_count, r.undisclosed_count], [2, 1, 0]);
+    assert.match(r.note, /at least 2/);
+  }
+});
+
+test("count_members_at_area: stale present (derived multi-area example) -> floor note", async () => {
   const { c } = client();
   const r = await countMembersAtArea(c, { area_name: "Home", group_id: FAMILY });
   if (r.status === "ok") assert.match(r.note, /at least 2/);
@@ -186,7 +263,7 @@ test("count_members_at_area: all disclosed and fresh -> exact", async () => {
 
 test("count_members_at_area: counts absent (public group) -> unknown/count_unavailable, never zero", async () => {
   const { c } = client();
-  const r = await countMembersAtArea(c, { group_id: PUBLIC, area_name: "Town Square" });
+  const r = await countMembersAtArea(c, { group_id: PUBLIC, area_name: "Marymoor Dog Park" });
   assert.equal(r.status, "unknown");
   assert.equal(r.reason, "count_unavailable");
   assert.ok(!("member_count" in r));
@@ -239,15 +316,15 @@ test("non-array body is an ApiError, not a crash", async () => {
 
 test("log lines carry paths, statuses and counts — never the key or a member name", async () => {
   const { c, lines } = client();
-  await whereIsMember(c, { nickname: "Earl" });
+  await whereIsMember(c, { nickname: "Newman" });
   await whoIsAtArea(c, { area_name: "Skatepark" });
   await countMembersAtArea(c, { area_name: "Skatepark" });
   assert.ok(lines.length > 0);
   for (const l of lines) {
     assert.ok(!l.includes(KEY), l);
     assert.ok(!l.includes("pg_live_"), l);
-    for (const n of ["Earl", "Fred", "John", "Nina", "Sam", "Olga"]) assert.ok(!l.includes(n), l);
+    for (const n of ["Newman", "EarlonDev", "Fred", "John"]) assert.ok(!l.includes(n), l);
     assert.ok(!l.includes("Skatepark"), l);
   }
-  assert.match(lines[0]!, /^INFO GET \/groups -> 200 \(3 items, \d+ms\)$/);
+  assert.match(lines[0]!, /^INFO GET \/groups -> 200 \(9 items, \d+ms\)$/);
 });

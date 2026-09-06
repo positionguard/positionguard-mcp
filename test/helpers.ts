@@ -10,40 +10,53 @@ export function fixture<T = unknown>(name: string): T {
   return JSON.parse(readFileSync(join(here, "fixtures", name), "utf8")) as T;
 }
 
-// Group IDs from fixtures/groups.json.
-export const FAMILY = "00000000-0000-4000-8000-0000000000a1";
-export const SKATE = "00000000-0000-4000-8000-0000000000a2";
-export const PUBLIC = "00000000-0000-4000-8000-0000000000a3";
-export const SKATEPARK = "00000000-0000-4000-8000-0000000000b1";
+// Group IDs from fixtures/groups.json (captured from api02; see fixtures/README.md).
+export const FAMILY = "00000000-0000-4000-8000-bc531f349788"; // "Family"
+export const SKATE = "00000000-0000-4000-8000-2c3dbeff7817"; // "Team 🛹 Skateboard"
+export const CONSENT = "00000000-0000-4000-8000-3d569ac8d566"; // holds Newman's disclosed-away row
+export const FRIENDS = "00000000-0000-4000-8000-0aaaa555fdd7"; // holds Newman's consent-off row
+export const PUBLIC = "00000000-0000-4000-8000-4108066fb6b0"; // "Dog Park @ Marymoor", group_type public
+export const SKATEPARK = "00000000-0000-4000-8000-8dd8d8268acd"; // area of "Team 🛹 Skateboard"; the derived Family fixtures reuse it
 
 // A route table for a fake PositionGuard API: path → status + body, or a
 // function for stateful behaviour. Paths are relative to /api/v1.
 export type Route = { status: number; body?: unknown; headers?: Record<string, string> };
 export type Routes = Record<string, Route | (() => Route)>;
 
-// The default world: Family holds every member fixture concatenated; Skate
-// Crew holds Earl again (at the Skatepark) and one withheld row; the public
-// group has an area with no counts. Note that Earl appears in two groups.
+// The default world, built on the captured group list. Each members.*.json
+// holds one state of one synthetic member, so a roster is a concatenation:
+// Newman appears in five groups in five different states, each row a capture
+// from a real group: at the Skatepark in "Family", stale at the Skatepark in
+// "Team 🛹 Skateboard", disclosed-away in "Consent Test Group", withheld
+// (consent off) in "Friends", Ghost-joined and inside the park in the public
+// "Dog Park @ Marymoor". Fred and John (sharing off) sit in "Family" and the
+// Consent Test Group; EarlonDev (away, no safety block) in the public group.
 export function defaultRoutes(): Routes {
   const family = [
     ...fixture<unknown[]>("members.disclosed_at_area.json"),
-    ...fixture<unknown[]>("members.disclosed_away.json"),
-    ...fixture<unknown[]>("members.consent_off.json"),
-    ...fixture<unknown[]>("members.ghost.json"),
     ...fixture<unknown[]>("members.sharing_off.json"),
-    ...fixture<unknown[]>("members.stale.json"),
   ];
-  const skate = [
-    ...fixture<unknown[]>("members.disclosed_at_area.json"),
-    ...fixture<unknown[]>("members.consent_off.json"),
+  const skate = [...fixture<unknown[]>("members.stale.json")];
+  const consent = [
+    ...fixture<unknown[]>("members.disclosed_away.json"),
+    ...fixture<unknown[]>("members.sharing_off.json"),
+  ];
+  const friends = [...fixture<unknown[]>("members.consent_off.json")];
+  const gym = [
+    ...fixture<unknown[]>("members.disclosed_away.public_group.json"),
+    ...fixture<unknown[]>("members.ghost_join.public_group.json"),
   ];
   return {
     "/groups": { status: 200, body: fixture("groups.json") },
     [`/groups/${FAMILY}/members`]: { status: 200, body: family },
     [`/groups/${FAMILY}/area-counts`]: { status: 200, body: fixture("area_counts.json") },
     [`/groups/${SKATE}/members`]: { status: 200, body: skate },
-    [`/groups/${SKATE}/area-counts`]: { status: 200, body: fixture("area_counts.json") },
-    [`/groups/${PUBLIC}/members`]: { status: 200, body: [] },
+    [`/groups/${SKATE}/area-counts`]: { status: 200, body: fixture("area_counts.skateboard.stale.json") },
+    [`/groups/${CONSENT}/members`]: { status: 200, body: consent },
+    [`/groups/${CONSENT}/area-counts`]: { status: 200, body: fixture("area_counts.consent_test_group.json") },
+    [`/groups/${FRIENDS}/members`]: { status: 200, body: friends },
+    [`/groups/${FRIENDS}/area-counts`]: { status: 200, body: [] },
+    [`/groups/${PUBLIC}/members`]: { status: 200, body: gym },
     [`/groups/${PUBLIC}/area-counts`]: { status: 200, body: fixture("area_counts.public_group.json") },
   };
 }
@@ -61,7 +74,16 @@ export function fakeFetch(routes: Routes, calls: string[] = []): { fetch: typeof
     }
     const r = routes[path];
     const route = typeof r === "function" ? r() : r;
-    if (!route) return new Response(JSON.stringify({ error: "group not found" }), { status: 404 });
+    if (!route) {
+      // A listed group with no fake route answers empty, so the captured
+      // eight-group list works without a route per group; anything else 404s.
+      const m = /^\/groups\/([^/]+)\/(members|area-counts)$/.exec(path);
+      const listed = (routes["/groups"] as Route | undefined)?.body as { id: string }[] | undefined;
+      if (m && listed?.some((g) => g.id === m[1])) {
+        return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "group not found" }), { status: 404 });
+    }
     return new Response(route.body === undefined ? "" : JSON.stringify(route.body), {
       status: route.status,
       headers: { "content-type": "application/json", ...(route.headers ?? {}) },

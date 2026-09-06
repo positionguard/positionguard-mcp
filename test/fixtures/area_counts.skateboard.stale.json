@@ -1,0 +1,16 @@
+[
+  {
+    "area_id": "00000000-0000-4000-8000-2bbc2d0c95c8",
+    "area_name": "Safeway",
+    "member_count": 0,
+    "stale_count": 0,
+    "undisclosed_count": 0
+  },
+  {
+    "area_id": "00000000-0000-4000-8000-8dd8d8268acd",
+    "area_name": "Skatepark",
+    "member_count": 2,
+    "stale_count": 1,
+    "undisclosed_count": 0
+  }
+]

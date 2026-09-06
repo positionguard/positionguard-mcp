@@ -1,0 +1,16 @@
+[
+  {
+    "area_id": "00000000-0000-4000-8000-b47828a96767",
+    "area_name": "Consent Test X",
+    "member_count": 0,
+    "stale_count": 0,
+    "undisclosed_count": 0
+  },
+  {
+    "area_id": "00000000-0000-4000-8000-6dc1c3ff08b2",
+    "area_name": "Consent Test Y",
+    "member_count": 0,
+    "stale_count": 0,
+    "undisclosed_count": 0
+  }
+]

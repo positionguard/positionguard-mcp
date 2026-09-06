@@ -1,22 +1,67 @@
 [
   {
-    "id": "00000000-0000-4000-8000-0000000000a1",
+    "id": "00000000-0000-4000-8000-3d569ac8d566",
+    "name": "Consent Test Group",
+    "description": "Stage B step 3 verification fixture",
+    "icon": "person.2.fill",
+    "group_type": "private",
+    "always_share_location": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-81d0d0a8b8ff",
+    "name": "Harness nested",
+    "icon": "person.2.fill",
+    "group_type": "private",
+    "always_share_location": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-375ddc1a3f74",
+    "name": "Public group",
+    "icon": "person.2.fill",
+    "group_type": "private",
+    "always_share_location": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-0aaaa555fdd7",
+    "name": "Friends",
+    "icon": "person.3.fill",
+    "group_type": "private",
+    "always_share_location": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-bc531f349788",
     "name": "Family",
-    "icon": "house",
+    "icon": "figure.2.and.child.holdinghands",
+    "group_type": "private",
+    "always_share_location": true
+  },
+  {
+    "id": "00000000-0000-4000-8000-f6177b48ca28",
+    "name": "Event",
+    "icon": "calendar",
     "group_type": "private",
     "always_share_location": false
   },
   {
-    "id": "00000000-0000-4000-8000-0000000000a2",
-    "name": "Skate Crew",
-    "icon": "skateboard",
+    "id": "00000000-0000-4000-8000-ae78a59cc7e0",
+    "name": "Team 425 gym",
+    "icon": "figure.run",
+    "group_type": "public",
+    "always_share_location": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-2c3dbeff7817",
+    "name": "Team 🛹 Skateboard",
+    "description": "Our local scateboard park",
+    "icon": "figure.run",
     "group_type": "private",
     "always_share_location": false
   },
   {
-    "id": "00000000-0000-4000-8000-0000000000a3",
-    "name": "Neighbourhood",
-    "icon": "map",
+    "id": "00000000-0000-4000-8000-4108066fb6b0",
+    "name": "Dog Park @ Marymoor",
+    "description": "Off-leash dog park regulars. See who's there before you make the drive.",
+    "icon": "pawprint.fill",
     "group_type": "public",
     "always_share_location": false
   }

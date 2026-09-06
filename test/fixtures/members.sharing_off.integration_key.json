@@ -1,7 +1,13 @@
 [
   {
-    "user_id": "00000000-0000-4000-8000-000000000005",
-    "nickname": "Sam",
+    "user_id": "00000000-0000-4000-8000-65db38271077",
+    "nickname": "Fred",
+    "inside": false,
+    "sharing_disabled": true
+  },
+  {
+    "user_id": "00000000-0000-4000-8000-7fedf5b48ee7",
+    "nickname": "John",
     "inside": false,
     "sharing_disabled": true
   }

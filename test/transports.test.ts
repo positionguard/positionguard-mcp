@@ -129,7 +129,7 @@ test("streamable HTTP at /mcp", async () => {
     for (const l of srv.stderr) {
       assert.ok(!l.includes(KEY), l);
       assert.ok(!l.startsWith("STDOUT"), l);
-      for (const n of ["John", "Earl", "Skatepark"]) assert.ok(!l.includes(n), l);
+      for (const n of ["John", "Newman", "Skatepark"]) assert.ok(!l.includes(n), l);
     }
   } finally {
     await srv.stop();
