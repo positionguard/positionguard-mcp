@@ -1,0 +1,23 @@
+[
+  {
+    "area_id": "00000000-0000-4000-8000-0000000000b1",
+    "area_name": "Skatepark",
+    "member_count": 1,
+    "stale_count": 0,
+    "undisclosed_count": 1
+  },
+  {
+    "area_id": "00000000-0000-4000-8000-0000000000b2",
+    "area_name": "Home",
+    "member_count": 2,
+    "stale_count": 1,
+    "undisclosed_count": 0
+  },
+  {
+    "area_id": "00000000-0000-4000-8000-0000000000b3",
+    "area_name": "School",
+    "member_count": 0,
+    "stale_count": 0,
+    "undisclosed_count": 0
+  }
+]

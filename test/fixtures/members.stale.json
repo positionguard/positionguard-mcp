@@ -1,0 +1,14 @@
+[
+  {
+    "user_id": "00000000-0000-4000-8000-000000000006",
+    "nickname": "Olga",
+    "inside": true,
+    "current_area": {
+      "id": "00000000-0000-4000-8000-0000000000b1",
+      "name": "Skatepark"
+    },
+    "last_update": "2026-09-05T14:02:44.001Z",
+    "safety_status": "stale",
+    "position_age_seconds": 2710
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-0000000000a1",
+    "name": "Family",
+    "icon": "house",
+    "group_type": "private",
+    "always_share_location": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000000000a2",
+    "name": "Skate Crew",
+    "icon": "skateboard",
+    "group_type": "private",
+    "always_share_location": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-0000000000a3",
+    "name": "Neighbourhood",
+    "icon": "map",
+    "group_type": "public",
+    "always_share_location": false
+  }
+]
