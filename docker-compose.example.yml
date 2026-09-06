@@ -1,0 +1,45 @@
+# Open WebUI + positionguard-mcp on one private network.
+#
+# Copy to docker-compose.yml, put the two secrets in a .env file next to it
+# (gitignored), and `docker compose up -d`. Then in Open WebUI:
+#   Admin → Settings → Connections: add Anthropic's OpenAI-compatible
+#     endpoint, base URL https://api.anthropic.com/v1, your Anthropic key.
+#   Admin → Settings → External Tools: add an MCP (Streamable HTTP) server at
+#     http://positionguard-mcp:8788/mcp with auth "None".
+#
+# Variable NAMES only in this file. Values live in .env:
+#   WEBUI_SECRET_KEY=<long random string>      Open WebUI session signing
+#   POSITIONGUARD_API_KEY=pg_live_...          an ASSISTANT (agent-type) key
+#                                              with presence:read, counts:read,
+#                                              groups:read — and not areas:read
+
+services:
+  positionguard-mcp:
+    build: .
+    # image: ghcr.io/positionguard/positionguard-mcp:latest   # when published
+    environment:
+      POSITIONGUARD_API_KEY: ${POSITIONGUARD_API_KEY:?set POSITIONGUARD_API_KEY in .env}
+      # POSITIONGUARD_API_BASE: https://api.positionguardai.com/api/v1   # default
+      TRANSPORT: http
+      PORT: "8788"
+    # No `ports:` on purpose. Only Open WebUI, on this network, can reach it.
+    networks: [assist]
+    restart: unless-stopped
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    environment:
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?set WEBUI_SECRET_KEY in .env}
+    ports:
+      - "127.0.0.1:3000:8080"
+    volumes:
+      - open-webui:/app/backend/data
+    networks: [assist]
+    depends_on: [positionguard-mcp]
+    restart: unless-stopped
+
+networks:
+  assist:
+
+volumes:
+  open-webui:
