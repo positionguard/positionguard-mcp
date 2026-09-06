@@ -6,8 +6,8 @@ import type { WireMember } from "./types.js";
 //   not_at_area  — the API disclosed the member's presence and it is not
 //                  inside any area of the group asked about.
 //   unknown      — everything else. The API withheld the member's presence
-//                  (they have not opted in to assistant access, or Ghost or
-//                  sharing-off is on), or their last report is too old to
+//                  (they have not opted in to assistant access, or sharing
+//                  is paused, or global Ghost is on), or their last report is too old to
 //                  vouch for. `unknown` is not evidence of absence.
 export type MemberStatus =
   | { status: "at_area"; area: { area_id: string; name: string }; since?: string }

@@ -34,8 +34,11 @@ read exactly what.
   returned. The key appears once at startup, as its first 16 characters,
   the same prefix the portal shows.
 - **`unknown` is not "away".** A member who has not opted in, who is in
-  Ghost mode, who paused sharing, or whose phone has not reported in a
-  while all look identical on the wire, and all map to `unknown`. The tool
+  global Ghost, who paused sharing, or whose phone has not reported in a
+  while all look identical on the wire, and all map to `unknown`; the
+  first three are captured in `test/fixtures/` and asserted identical. The
+  Ghost mode of public groups is a different thing and is not masked on
+  the REST roster today (see `test/fixtures/README.md`). The tool
   descriptions tell the model, in so many words, that `unknown` means it
   doesn't know. A stale last-known position is never returned as a
   location; counts include stale members and say so.

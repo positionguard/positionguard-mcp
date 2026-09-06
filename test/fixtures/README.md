@@ -27,6 +27,7 @@ here. That is where `unknown` is proven before any model sees the server.
 | `members.disclosed_away.json` | Newman: consent on, sharing on, not at any area of this group; the safety block names an area of another group | `not_at_area` | captured 2026-09-06 (api02, Assistant key) |
 | `members.disclosed_away.public_group.json` | EarlonDev: consent on, elsewhere, seen through the **public** Dog Park @ Marymoor, whose rosters carry no safety block | `unknown` (conservative: byte-identical to a withheld row; a deployment with `SAFETY_STATUS_ENABLED=false` looks the same) | captured 2026-09-06 (api02, Assistant key) |
 | `members.consent_off.json` | Newman: still inside Skatepark, sharing on, agent access switched off | `unknown` | captured 2026-09-06 (api02, Assistant key) |
+| `members.ghost.json` | Newman: global Ghost (`users.privacy_level = 'ghost'`, set by SQL), still inside Skatepark | `unknown` | captured 2026-09-06 (api02, Assistant key) |
 | `members.ghost_join.public_group.json` | Newman: joined Dog Park @ Marymoor, a public group he was not a member of before, in Ghost mode; consent on; standing inside Marymoor Dog Park (his presence endpoint listed the park at the same moment) | `at_area` — see *Known API gap* | captured 2026-09-06 (api02, Assistant key) |
 | `members.sharing_off.json` | Fred and John: sharing paused; the gate suppresses before it reads consent | `unknown` | captured 2026-09-06 (api02, Assistant key) |
 | `members.sharing_off.integration_key.json` | the same two members, seen by an **integration** key | `unknown` | captured 2026-09-06 (api02, integration key) |
@@ -35,6 +36,7 @@ here. That is where `unknown` is proven before any model sees the server.
 | `area_counts.skateboard.disclosed.json` | Team 🛹 Skateboard with two disclosed members at Skatepark | exact count | captured 2026-09-06 (api02, Assistant key) |
 | `area_counts.skateboard.undisclosed.json` | same group after Newman switched agent access off: he moves from `member_count` to `undisclosed_count` | floor, "at least 1" | captured 2026-09-06 (api02, Assistant key) |
 | `area_counts.skateboard.stale.json` | same group with Newman stale: still in `member_count`, now also in `stale_count` | floor, "at least 2" | captured 2026-09-06 (api02, Assistant key) |
+| `area_counts.skateboard.ghost.json` | same group with Newman as global Ghost: gone from every bucket | exact count | captured 2026-09-06 (api02, Assistant key) |
 | `area_counts.consent_test_group.json` | private group, nobody inside: real zeros, all three fields present | exact count | captured 2026-09-06 (api02, Assistant key; byte-identical with the integration key) |
 | `area_counts.public_group.json` | Dog Park @ Marymoor, a public group: one area, counts absent, never zero | `count_unavailable` | captured 2026-09-06 (api02, Assistant key) |
 
@@ -42,7 +44,22 @@ here. That is where `unknown` is proven before any model sees the server.
 rendering code (`memberResp` / `areaCountResp` in
 `PositionGuard-API/internal/rest/rest.go` and the agent-consent runbook's
 verified matrix), not captured from a running server. *captured* means
-`npm run capture -- <group_id>` output, saved verbatim. ## Known API gap: public-group Ghost is not masked on the REST roster
+`npm run capture -- <group_id>` output, saved verbatim.
+
+## Global Ghost
+
+The API has a second, global Ghost (`users.privacy_level = 'ghost'`,
+"invisible everywhere"). It is not the Ghost the app offers — that is the
+public-group join mode below — and it was set by SQL on api02 for the
+capture. The byte-identity claim therefore rests on three captures:
+consent-off (Newman), global Ghost (Newman) and sharing-off (Fred, John)
+are identical apart from identity, and `npm test` asserts it. Global
+Ghost also removes the member from every count bucket
+(`area_counts.skateboard.ghost.json`: 2/1/0 became 1/0/0 while Newman's
+stale position was still inside the area), where consent-off moves them
+to `undisclosed_count`.
+
+## Known API gap: public-group Ghost is not masked on the REST roster
 
 Ghost mode exists only in public groups, as a per-member `join_mode`. The
 app's roster renders such a member as "Hidden member" and the map drops

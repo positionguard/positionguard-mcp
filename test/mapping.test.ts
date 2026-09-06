@@ -38,7 +38,7 @@ test("disclosed member away in a PUBLIC group (captured) -> unknown, never not_a
   assert.deepEqual(memberStatus(r), { status: "unknown", reason: "not_disclosed" });
 });
 
-for (const name of ["members.consent_off.json", "members.sharing_off.json"]) {
+for (const name of ["members.consent_off.json", "members.ghost.json", "members.sharing_off.json"]) {
   test(`${name}: the withheld shape -> unknown (not not_at_area)`, () => {
     for (const r of rows(name)) {
       assert.equal(r.inside, false, "withheld rows say inside: false");
@@ -47,13 +47,15 @@ for (const name of ["members.consent_off.json", "members.sharing_off.json"]) {
   });
 }
 
-test("the withheld shapes are indistinguishable apart from identity (captured sharing-off rows included)", () => {
+test("the three captured withheld shapes (consent-off, global Ghost, sharing-off) are indistinguishable apart from identity", () => {
   const strip = (r: WireMember) => {
     const { user_id: _u, nickname: _n, avatar_url: _a, ...rest } = r;
     return rest;
   };
-  const shapes = ["members.consent_off.json", "members.sharing_off.json"].flatMap((n) => rows(n).map(strip));
-  assert.ok(shapes.length >= 3);
+  const shapes = ["members.consent_off.json", "members.ghost.json", "members.sharing_off.json"].flatMap((n) =>
+    rows(n).map(strip),
+  );
+  assert.ok(shapes.length >= 4);
   for (const s of shapes) assert.deepEqual(s, { inside: false });
 });
 

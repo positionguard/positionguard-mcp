@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { ApiError, PositionGuardClient } from "../src/core/client.js";
 import { countMembersAtArea, listAreas, listGroups, whereIsMember, whoIsAtArea } from "../src/core/tools.js";
 import { fixture } from "./helpers.js";
-import { captureLog, CONSENT, defaultRoutes, fakeFetch, FAMILY, FRIENDS, PUBLIC, SKATE, SKATEPARK, type Routes } from "./helpers.js";
+import { captureLog, CONSENT, defaultRoutes, EVENT, fakeFetch, FAMILY, FRIENDS, PUBLIC, SKATE, SKATEPARK, type Routes } from "./helpers.js";
 
 const KEY = "pg_live_0123456789abcdef0123456789abcdef";
 
@@ -73,6 +73,23 @@ test("where_is_member: Newman with consent off (captured row) -> unknown, not no
     reason: "not_disclosed",
     nickname: "Newman",
   });
+});
+
+test("where_is_member: Newman as global Ghost (captured row) -> unknown, not not_at_area", async () => {
+  const { c } = client();
+  assert.deepEqual(await whereIsMember(c, { nickname: "Newman", group_id: EVENT }), {
+    status: "unknown",
+    reason: "not_disclosed",
+    nickname: "Newman",
+  });
+});
+
+test("count_members_at_area: captured Skatepark with Newman as global Ghost -> 1/0/0, in no bucket at all", async () => {
+  const routes = defaultRoutes();
+  routes[`/groups/${SKATE}/area-counts`] = { status: 200, body: fixture("area_counts.skateboard.ghost.json") };
+  const r = await countMembersAtArea(client(routes).c, { group_id: SKATE, area_id: SKATEPARK });
+  assert.equal(r.status, "ok");
+  if (r.status === "ok") assert.deepEqual([r.member_count, r.stale_count, r.undisclosed_count], [1, 0, 0]);
 });
 
 test("where_is_member: Ghost-joined member inside a public group's area (captured row) -> at_area, because the API does not mask join-mode Ghost on this roster", async () => {

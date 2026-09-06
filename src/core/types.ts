@@ -20,9 +20,10 @@ export interface WireAreaBrief {
 //
 // The load-bearing fact for this server: an agent-type key receives, for any
 // member it may not see, exactly `user_id`, `nickname`, `avatar_url` and
-// `inside: false` — nothing else. Consent off, Ghost, sharing off and a
-// lapsed position all render identically. That shape is `unknown`; see
-// mapping.ts.
+// `inside: false` — nothing else. Consent off, global Ghost and sharing off
+// render identically (all three captured in test/fixtures). That shape is
+// `unknown`; see mapping.ts. Public-group Ghost is a separate join mode the
+// roster does not mask today.
 export interface WireMember {
   user_id: string;
   nickname?: string;
