@@ -113,7 +113,7 @@ on localhost, and do not expose it.
 Each setup is marked **tested** or **untested**. Only tested setups describe
 behaviour that has actually been observed with this server.
 
-### 1. Open WebUI + Anthropic + this server, in containers — untested
+### 1. Open WebUI + Anthropic + this server, in containers — tested
 
 `docker-compose.example.yml` runs Open WebUI and this server on one private
 network with no port published for the server. Put `WEBUI_SECRET_KEY` and
@@ -134,7 +134,9 @@ Open WebUI has supported Streamable HTTP MCP servers natively since 0.6.31.
 Disclosure for this and any other cloud-model setup: presence you've chosen
 to disclose is sent to the model provider to produce answers.
 
-### 2. Claude Desktop, stdio — untested
+Verified against the production API with an Assistant key: a member who has turned the setting on returns their area; the same member with it off returns unknown, not "away"; and a count with an undisclosed or stale member is reported as a floor.
+
+### 2. Claude Desktop, stdio — tested
 
 Build once (`npm install && npm run build`), then add to Claude Desktop's
 `claude_desktop_config.json`:
