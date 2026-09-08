@@ -222,8 +222,8 @@ export async function countMembersAtArea(
       group_id,
       group_name,
       note:
-        "PositionGuard did not provide a count for this area. Counts exist only for " +
-        "active areas of private groups. Do not report zero; say the count is not available.",
+        "PositionGuard did not provide a count for this area: it is archived, or the count " +
+        "could not be computed. Do not report zero; say the count is not available.",
     };
   }
 

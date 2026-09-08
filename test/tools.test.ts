@@ -338,6 +338,10 @@ test("count_members_at_area: counts absent (the withheld shape, captured from a 
   assert.equal(r.status, "unknown");
   assert.equal(r.reason, "count_unavailable");
   assert.ok(!("member_count" in r));
+  if (r.reason === "count_unavailable") {
+    assert.match(r.note, /archived, or the count could not be computed/);
+    assert.ok(!r.note.includes("private"), "public groups are served counts now; the note must not say otherwise");
+  }
 });
 
 test("count_members_at_area: public group, counts served (captured) -> ok with real zeros, not count_unavailable", async () => {
