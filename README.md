@@ -134,7 +134,9 @@ Open WebUI has supported Streamable HTTP MCP servers natively since 0.6.31.
 Disclosure for this and any other cloud-model setup: presence you've chosen
 to disclose is sent to the model provider to produce answers.
 
-Verified against the production API with an Assistant key: a member who has turned the setting on returns their area; the same member with it off returns unknown, not "away"; and a count with an undisclosed or stale member is reported as a floor.
+Verified against the production API with an Assistant key. 
+A member who has turned the setting on returns their area; the same member with it off returns unknown, not "away". 
+A count with an undisclosed or stale member is reported as a floor.
 
 ### 2. Claude Desktop, stdio — tested
 
