@@ -6,7 +6,8 @@ of the member whose state it captures), with IDs redacted to
 `00000000-0000-4000-8000-<12 hex of the ID's SHA-256>` — stable across
 captures, so the same member or area has the same placeholder in every
 file — and `avatar_url` dropped. Nicknames are those of synthetic api02
-test accounts (Newman, Fred, John).
+test accounts (Newman, Fred, John, EarlonDev, MikeL, and a seeded member
+nicknamed PositionGuard on the Dog Park roster).
 
 **Key type of the captures.** Captured files come from an **Assistant**
 (agent-type) key unless the file name says `integration_key`. The wire
@@ -25,10 +26,10 @@ here. That is where `unknown` is proven before any model sees the server.
 | `groups.json` | `GET /groups`: the Newman account's nine groups, two public | — | captured 2026-09-06 (api02, Assistant key) |
 | `members.disclosed_at_area.json` | Newman: consent on, inside Skatepark (Team 🛹 Skateboard) | `at_area` | captured 2026-09-06 (api02, Assistant key) |
 | `members.disclosed_away.json` | Newman: consent on, sharing on, not at any area of this group; the safety block names an area of another group | `not_at_area` | captured 2026-09-06 (api02, Assistant key) |
-| `members.disclosed_away.public_group.json` | EarlonDev: consent on, elsewhere, seen through the **public** Dog Park @ Marymoor, whose rosters carry no safety block | `unknown` (conservative: byte-identical to a withheld row; a deployment with `SAFETY_STATUS_ENABLED=false` looks the same) | captured 2026-09-06 (api02, Assistant key) |
+| `members.disclosed_away.public_group.json` | EarlonDev: consent on, elsewhere, seen through the **public** Dog Park @ Marymoor, whose rosters carry no safety block | `unknown` (conservative: byte-identical to a withheld row; a deployment with `SAFETY_STATUS_ENABLED=false` looks the same) | captured 2026-09-06 (api02, Assistant key); re-captured byte-identical 2026-09-07 through Team 425 gym, where he is a named member (his Dog Park row is now `"Anonymous"`, below) |
 | `members.consent_off.json` | Newman: still inside Skatepark, sharing on, agent access switched off | `unknown` | captured 2026-09-06 (api02, Assistant key) |
 | `members.ghost.json` | Newman: global Ghost (`users.privacy_level = 'ghost'`, set by SQL), still inside Skatepark | `unknown` | captured 2026-09-06 (api02, Assistant key) |
-| `members.ghost_join.public_group.json` | Newman: joined Dog Park @ Marymoor, a public group he was not a member of before, in Ghost mode; consent on; standing inside Marymoor Dog Park (his presence endpoint listed the park at the same moment) | `at_area` — see *Known API gap* | captured 2026-09-06 (api02, Assistant key) |
+| `members.ghost_join.public_group.json` | the whole Dog Park @ Marymoor roster after the fix: MikeL as himself, EarlonDev as `"Anonymous"` (anonymous join; same placeholder ID as his named rows; `avatar_url` absent on the raw wire where MikeL's row carried one) and a seeded member nicknamed PositionGuard. Newman, whom the api02 verification left Ghost-joined to the park, has **no row**. Nobody was inside the park at capture time, so every row is `inside: false` | Newman: no row; every served row `unknown` — see *Public-group Ghost* | captured 2026-09-07 (api02, Assistant key) |
 | `members.sharing_off.json` | Fred and John: sharing paused; the gate suppresses before it reads consent | `unknown` | captured 2026-09-06 (api02, Assistant key) |
 | `members.sharing_off.integration_key.json` | the same two members, seen by an **integration** key | `unknown` | captured 2026-09-06 (api02, integration key) |
 | `members.stale.json` | Newman: consent on, still inside Skatepark, app force-stopped until his last position was older than the stale window (50 minutes on api02, per the safety-status runbook) | `unknown` (reason `stale`) | captured 2026-09-06 (api02, Assistant key) |
@@ -38,7 +39,8 @@ here. That is where `unknown` is proven before any model sees the server.
 | `area_counts.skateboard.stale.json` | same group with Newman stale: still in `member_count`, now also in `stale_count` | floor, "at least 2" | captured 2026-09-06 (api02, Assistant key) |
 | `area_counts.skateboard.ghost.json` | same group with Newman as global Ghost: gone from every bucket | exact count | captured 2026-09-06 (api02, Assistant key) |
 | `area_counts.consent_test_group.json` | private group, nobody inside: real zeros, all three fields present | exact count | captured 2026-09-06 (api02, Assistant key; byte-identical with the integration key) |
-| `area_counts.public_group.json` | Dog Park @ Marymoor, a public group: one area, counts absent, never zero | `count_unavailable` | captured 2026-09-06 (api02, Assistant key) |
+| `area_counts.public_group.json` | Dog Park @ Marymoor, a public group: counts now served, all three fields present; real zeros because nobody was inside at capture time | exact count | captured 2026-09-07 (api02, Assistant key) |
+| `area_counts.public_group.withheld.json` | the same area before the fix: one area, counts absent, never zero. Kept as the withheld shape, which `areaCountResp` still renders for an archived area or a count it could not compute | `count_unavailable` | captured 2026-09-06 (api02, Assistant key), pre-fix wire |
 
 **Provenance.** *derived* means the file was written from the API's
 rendering code (`memberResp` / `areaCountResp` in
@@ -59,29 +61,53 @@ Ghost also removes the member from every count bucket
 stale position was still inside the area), where consent-off moves them
 to `undisclosed_count`.
 
-## Known API gap: public-group Ghost is not masked on the REST roster
+## Public-group Ghost: fixed on the REST roster
 
-Ghost mode exists only in public groups, as a per-member `join_mode`. The
-app's roster renders such a member as "Hidden member" and the map drops
-their node (`maskMemberForList` and `computeViewerModes` in
-`PositionGuard-API/graph/visibility.go`). `GET /groups/{id}/members` does
-not read `join_mode`: it returns the real nickname and, when the member is
-inside one of the group's areas, `current_area` — to integration and agent
-keys alike. The agent consent gate does not close this either: `AgentView`
-only knows global Ghost (`users.privacy_level`). Observed on api02 on
-2026-09-06: Newman joined Dog Park @ Marymoor fresh, in Ghost mode, and
-when his position landed inside the park the Assistant key's roster
-showed him there by name. The fixture above is that response.
+Ghost mode exists only in public groups, as a per-member `join_mode`, next
+to an anonymous join mode. The app's roster renders a Ghost member as
+"Hidden member" and the map drops their node (`maskMemberForList` and
+`computeViewerModes` in `PositionGuard-API/graph/visibility.go`).
 
-This server maps the row faithfully to `at_area`, because the wire is a
-disclosed row and this server does not filter in its own code — the
-guarantee has to live at the API boundary. Until the API masks join-mode
-Ghost, an assistant whose key holder is in a public group can be told
-that a Ghost-joined member is at that group's area. Reported to the
-backend; when fixed, this row becomes the withheld shape and the tests
-that pin the current behaviour flip to `unknown`.
+**The gap, as reproduced on api02 on 2026-09-06.** `GET
+/groups/{id}/members` did not read `join_mode`: it returned the real
+nickname and, when the member was inside one of the group's areas,
+`current_area` — to integration and agent keys alike. The agent consent
+gate did not close it either: `AgentView` only knows global Ghost
+(`users.privacy_level`). Newman joined Dog Park @ Marymoor fresh, in Ghost
+mode, and when his position landed inside the park the Assistant key's
+roster showed him there by name. That response was the previous
+`members.ghost_join.public_group.json`, and this server mapped it
+faithfully to `at_area`: the wire was a disclosed row, and this server
+does not filter in its own code — the guarantee has to live at the API
+boundary.
 
-Every member state is now captured. The one remaining *derived* file is
-`area_counts.json`, a multi-area floor-count example (one area with an
-undisclosed member, one with a stale member, one exact) kept because no
-api02 group has all three at once; its Skatepark ID follows the capture.
+**The fix.** Backend commits `ea6d8af`, `374da6b`, `9f014f0` and
+`6a29048`, live on api02 and api01 as of 2026-09-07. On REST, for public
+groups only (private groups are byte-identical to before):
+
+- a Ghost-joined member has **no row at all** on the roster;
+- an anonymous-joined member is listed as `"Anonymous"`, `avatar_url`
+  omitted, presence fields kept;
+- area-counts are **served**, counting every active member regardless of
+  join mode, so the roster and the count deliberately disagree;
+- above `PUBLIC_GROUP_MEMBER_LIMIT` (50) the roster is the caller's own row
+  only, while the counts stay full;
+- a Ghost-joined group is not a shared group: no `safety_area` name, no
+  `inside_areas` entry.
+
+`members.ghost_join.public_group.json` and `area_counts.public_group.json`
+are the post-fix wire, captured 2026-09-07: Newman is on neither. The test
+that pinned the gap now asserts his absence.
+
+**Not yet captured.** Nobody was inside the park on 2026-09-07 (Newman's
+and EarlonDev's last positions were at the Skatepark, stale), so the
+roster/count disagreement — `member_count: 3` beside a two-row roster —
+and a masked-but-present `"Anonymous"` row with `current_area` are not in
+this directory. Re-placing MikeL, EarlonDev and Newman inside the park and
+re-running `npm run capture` for the Dog Park overwrites both files with
+that state. The over-limit roster and a public-group floor (one member
+with agent access off inside the park, ideally one stale) are likewise
+uncaptured; the one remaining *derived* file is still `area_counts.json`,
+a multi-area floor-count example (one area with an undisclosed member,
+one with a stale member, one exact) kept because no api02 group has all
+three at once; its Skatepark ID follows the capture.

@@ -17,6 +17,7 @@ export const CONSENT = "00000000-0000-4000-8000-3d569ac8d566"; // holds Newman's
 export const EVENT = "00000000-0000-4000-8000-f6177b48ca28"; // holds Newman's global-Ghost row
 export const FRIENDS = "00000000-0000-4000-8000-0aaaa555fdd7"; // holds Newman's consent-off row
 export const PUBLIC = "00000000-0000-4000-8000-4108066fb6b0"; // "Dog Park @ Marymoor", group_type public
+export const GYM = "00000000-0000-4000-8000-ae78a59cc7e0"; // "Team 425 gym", group_type public
 export const SKATEPARK = "00000000-0000-4000-8000-8dd8d8268acd"; // area of "Team 🛹 Skateboard"; the derived Family fixtures reuse it
 
 // A route table for a fake PositionGuard API: path → status + body, or a
@@ -26,12 +27,14 @@ export type Routes = Record<string, Route | (() => Route)>;
 
 // The default world, built on the captured group list. Each members.*.json
 // holds one state of one synthetic member, so a roster is a concatenation:
-// Newman appears in six groups in six different states, each row a capture
+// Newman appears in five groups in five different states, each row a capture
 // from a real group: at the Skatepark in "Family", stale at the Skatepark in
 // "Team 🛹 Skateboard", disclosed-away in "Consent Test Group", withheld
-// (consent off) in "Friends", global Ghost in "Event", Ghost-joined and
-// inside the park in the public "Dog Park @ Marymoor". Fred and John (sharing off) sit in "Family" and the
-// Consent Test Group; EarlonDev (away, no safety block) in the public group.
+// (consent off) in "Friends", global Ghost in "Event". He is also a
+// Ghost-joined member of the public "Dog Park @ Marymoor", whose roster is
+// served whole (members.ghost_join.public_group.json) and has no row for
+// him. Fred and John (sharing off) sit in "Family" and the Consent Test
+// Group; EarlonDev (away, no safety block) in the public "Team 425 gym".
 export function defaultRoutes(): Routes {
   const family = [
     ...fixture<unknown[]>("members.disclosed_at_area.json"),
@@ -44,10 +47,8 @@ export function defaultRoutes(): Routes {
   ];
   const friends = [...fixture<unknown[]>("members.consent_off.json")];
   const event = [...fixture<unknown[]>("members.ghost.json")];
-  const gym = [
-    ...fixture<unknown[]>("members.disclosed_away.public_group.json"),
-    ...fixture<unknown[]>("members.ghost_join.public_group.json"),
-  ];
+  const park = [...fixture<unknown[]>("members.ghost_join.public_group.json")];
+  const gym = [...fixture<unknown[]>("members.disclosed_away.public_group.json")];
   return {
     "/groups": { status: 200, body: fixture("groups.json") },
     [`/groups/${FAMILY}/members`]: { status: 200, body: family },
@@ -60,8 +61,9 @@ export function defaultRoutes(): Routes {
     [`/groups/${EVENT}/members`]: { status: 200, body: event },
     [`/groups/${EVENT}/area-counts`]: { status: 200, body: [] },
     [`/groups/${FRIENDS}/area-counts`]: { status: 200, body: [] },
-    [`/groups/${PUBLIC}/members`]: { status: 200, body: gym },
+    [`/groups/${PUBLIC}/members`]: { status: 200, body: park },
     [`/groups/${PUBLIC}/area-counts`]: { status: 200, body: fixture("area_counts.public_group.json") },
+    [`/groups/${GYM}/members`]: { status: 200, body: gym },
   };
 }
 

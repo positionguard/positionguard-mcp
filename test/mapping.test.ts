@@ -92,13 +92,24 @@ test("stale member still inside an area (captured) -> unknown with reason stale;
   assert.deepEqual(memberStatus(r), { status: "unknown", reason: "stale" });
 });
 
-test("Ghost-joined member inside a public group's area (captured) -> at_area: the wire is a disclosed row", () => {
-  // See test/fixtures/README.md, "Known API gap". Mapping is faithful to the
-  // wire; the masking belongs at the API boundary.
-  const r = row("members.ghost_join.public_group.json");
-  assert.equal(r.inside, true);
-  assert.equal(r.safety_status, undefined, "public rosters carry no safety block");
-  assert.equal(memberStatus(r).status, "at_area");
+test("Ghost-joined member of a public group (captured roster) -> no row at all; the anonymous-join member is served as \"Anonymous\"", () => {
+  // The whole Dog Park @ Marymoor roster as served after the backend fix
+  // (test/fixtures/README.md, "Public-group Ghost"). Newman joined in Ghost
+  // mode and has no row: nothing for this server to map, nothing to leak.
+  // EarlonDev joined anonymously and is served under the fixed nickname
+  // "Anonymous", with the same placeholder user_id as his named rows.
+  const roster = rows("members.ghost_join.public_group.json");
+  const newman = row("members.disclosed_at_area.json");
+  assert.ok(!roster.some((r) => r.user_id === newman.user_id), "Newman's placeholder ID is not on the roster");
+  assert.ok(!roster.some((r) => r.nickname === "Newman"));
+  const earlon = row("members.disclosed_away.public_group.json");
+  const masked = roster.find((r) => r.user_id === earlon.user_id);
+  assert.ok(masked, "EarlonDev is still a member, under a masked row");
+  assert.equal(masked.nickname, "Anonymous");
+  for (const r of roster) {
+    assert.equal(r.safety_status, undefined, "public rosters carry no safety block");
+    assert.notEqual(memberStatus(r).status, "not_at_area", "an away row on a public roster is unknown, never not_at_area");
+  }
 });
 
 test("inside: true without current_area (not a wire shape) -> unknown, defensively", () => {

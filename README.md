@@ -36,12 +36,13 @@ read exactly what.
 - **`unknown` is not "away".** A member who has not opted in, who is in
   global Ghost, who paused sharing, or whose phone has not reported in a
   while all look identical on the wire, and all map to `unknown`; the
-  first three are captured in `test/fixtures/` and asserted identical. The
-  Ghost mode of public groups is a different thing and is not masked on
-  the REST roster today (see `test/fixtures/README.md`). The tool
-  descriptions tell the model, in so many words, that `unknown` means it
-  doesn't know. A stale last-known position is never returned as a
-  location; counts include stale members and say so.
+  first three are captured in `test/fixtures/` and asserted identical. A
+  member who joined a public group in Ghost mode is not on that roster at
+  all, and one who joined anonymously is listed as "Anonymous"; the API
+  does that before this server sees the roster. The tool descriptions
+  tell the model, in so many words, that `unknown` means it doesn't know.
+  A stale last-known position is never returned as a location; counts
+  include stale members and say so.
 - **No caching.** The API caches for 15 seconds. A second cache would be a
   second place for a withdrawn consent to lag.
 - **Read-only.** No write tools, no coordinates, no messages, no history.
@@ -67,8 +68,8 @@ across all of them. Its `reason` is `not_disclosed`, `stale`, or
 `no_such_member` (which is an answer, not an error, so the model doesn't
 invent one). `member_count` is a floor when `undisclosed_count` or
 `stale_count` is non-zero, and the `note` says to report it as "at least
-N". When the API provides no count at all (public groups, archived areas),
-the answer is `unknown` with reason `count_unavailable`, never zero.
+N". When the API provides no count at all (archived areas), the answer is
+`unknown` with reason `count_unavailable`, never zero.
 
 How the wire maps to `status` is written out in `src/core/mapping.ts` and
 tested against captured responses in `test/fixtures/` before any model

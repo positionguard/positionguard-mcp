@@ -22,8 +22,9 @@ export interface WireAreaBrief {
 // member it may not see, exactly `user_id`, `nickname`, `avatar_url` and
 // `inside: false` — nothing else. Consent off, global Ghost and sharing off
 // render identically (all three captured in test/fixtures). That shape is
-// `unknown`; see mapping.ts. Public-group Ghost is a separate join mode the
-// roster does not mask today.
+// `unknown`; see mapping.ts. Public-group join modes are applied by the API
+// before the roster is rendered: a Ghost-joined member has no row at all, an
+// anonymous-join member is listed as "Anonymous" without avatar_url.
 export interface WireMember {
   user_id: string;
   nickname?: string;
@@ -39,8 +40,9 @@ export interface WireMember {
 
 // One entry from GET /groups/{id}/area-counts. Coordinate-free by contract.
 // The three counts share one tri-state: all present (integers), or all
-// absent (non-private group, archived area, or the count could not be
-// computed). Absent is never zero.
+// absent (archived area, or the count could not be computed). Absent is
+// never zero. Public groups are served counts too (since backend commits
+// ea6d8af..6a29048, 2026-09-07); before that they got the absent shape.
 export interface WireAreaCount {
   area_id: string;
   area_name: string;
