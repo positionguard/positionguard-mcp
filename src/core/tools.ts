@@ -124,6 +124,7 @@ export type WhoIsAtAreaResult =
       group_name: string;
       members: string[];
       undisclosed_note?: string;
+      count_note?: string;
     }
   | { status: "unknown"; reason: "no_such_area" };
 
@@ -156,6 +157,21 @@ export async function whoIsAtArea(client: PositionGuardClient, args: AreaArgs): 
       `${unknownRows === 1 ? "has" : "have"} not shared presence with assistants, or ` +
       `${unknownRows === 1 ? "has" : "have"} no fresh report. Any of them may be at this area. ` +
       "This list is who is confirmed here, not everyone who is here.";
+  }
+
+  // The area's count rode along on the call that resolved the area. When it
+  // exceeds the rows listed, the roster is not the whole answer and the list
+  // must not be presented as one: a public group serves no row for a
+  // Ghost-joined member and, above its member limit, no row but the caller's
+  // own; a private group keeps a stale member's row, which is not listed.
+  const counted = resolved.area.member_count;
+  const listed = present.length;
+  if (counted !== undefined && counted > listed) {
+    out.count_note =
+      `${counted} counted at this area, ${listed === 0 ? "none" : listed} listed. ` +
+      "The rest are counted without being listed: they joined the group in Ghost mode, the roster " +
+      "is capped, or their last report is not fresh. " +
+      "Report the list as who is confirmed here, not as everyone who is here.";
   }
   return out;
 }

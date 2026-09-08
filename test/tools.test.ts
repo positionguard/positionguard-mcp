@@ -230,6 +230,41 @@ test("who_is_at_area: no withheld rows -> no note", async () => {
   if (r.status === "ok") {
     assert.deepEqual(r.members, ["Newman"]);
     assert.equal(r.undisclosed_note, undefined);
+    assert.equal(r.count_note, undefined, "one counted, one listed: nothing to add");
+  }
+});
+
+test("who_is_at_area: count above the rows listed (captured Skatepark, Newman stale) -> count_note beside the undisclosed note", async () => {
+  // The Skateboard group in the default world: the roster is Newman's stale
+  // row (unknown, so not listed) and the counts from the same capture are
+  // 2/1/0. Two counted, none listed, and the answer says so.
+  const { c } = client();
+  const r = await whoIsAtArea(c, { group_id: SKATE, area_id: SKATEPARK });
+  assert.equal(r.status, "ok");
+  if (r.status === "ok") {
+    assert.deepEqual(r.members, []);
+    assert.match(r.undisclosed_note!, /^1 member /);
+    assert.match(r.count_note!, /^2 counted at this area, none listed\./);
+    assert.ok(!r.count_note!.includes("Newman"));
+  }
+});
+
+test("who_is_at_area: count above a roster with nothing withheld (the Ghost-joined or capped shape) -> count_note alone", async () => {
+  // Newman's captured at-area row beside the captured Skatepark count of 2:
+  // one listed, two counted, no withheld row to hang a note on. This is what
+  // a public group serves when a Ghost-joined member is inside, or above its
+  // member limit, and without count_note the one row reads as everyone.
+  const routes = defaultRoutes();
+  routes[`/groups/${SKATE}/members`] = { status: 200, body: fixture("members.disclosed_at_area.json") };
+  routes[`/groups/${SKATE}/area-counts`] = { status: 200, body: fixture("area_counts.skateboard.disclosed.json") };
+  const { c } = client(routes);
+  const r = await whoIsAtArea(c, { group_id: SKATE, area_id: SKATEPARK });
+  assert.equal(r.status, "ok");
+  if (r.status === "ok") {
+    assert.deepEqual(r.members, ["Newman"]);
+    assert.equal(r.undisclosed_note, undefined);
+    assert.match(r.count_note!, /^2 counted at this area, 1 listed\./);
+    assert.match(r.count_note!, /confirmed here/);
   }
 });
 

@@ -60,16 +60,21 @@ and are never retried.
 | `list_groups` | `groups:read` | `{status, groups: [{group_id, name, group_type}]}` |
 | `list_areas` | `counts:read` | `{status, areas: [{area_id, name, group_id, group_name}]}` — names only, no counts, no geometry |
 | `where_is_member` | `presence:read` | `{status: "at_area", area, since}` \| `{status: "not_at_area"}` \| `{status: "unknown", reason}` |
-| `who_is_at_area` | `presence:read` | `{status, area, members: [nickname…], undisclosed_note?}` — disclosed members only |
+| `who_is_at_area` | `presence:read` | `{status, area, members: [nickname…], undisclosed_note?, count_note?}` — disclosed members only |
 | `count_members_at_area` | `counts:read` | `{status, member_count, stale_count, undisclosed_count, note}` |
 
 `where_is_member` looks a nickname up case-insensitively, in one group or
 across all of them. Its `reason` is `not_disclosed`, `stale`, or
 `no_such_member` (which is an answer, not an error, so the model doesn't
-invent one). `member_count` is a floor when `undisclosed_count` or
-`stale_count` is non-zero, and the `note` says to report it as "at least
-N". When the API provides no count at all (archived areas), the answer is
-`unknown` with reason `count_unavailable`, never zero.
+invent one). `who_is_at_area` adds `count_note` ("N counted at this area,
+M listed") whenever the area's count exceeds the rows it listed: a public
+group serves no row for a Ghost-joined member and, above its member
+limit, no row but the caller's own, so the list is never presented as
+complete when the count says otherwise. `member_count` is a floor when
+`undisclosed_count` or `stale_count` is non-zero, and the `note` says to
+report it as "at least N". When the API provides no count at all (archived
+areas), the answer is `unknown` with reason `count_unavailable`, never
+zero.
 
 How the wire maps to `status` is written out in `src/core/mapping.ts` and
 tested against captured responses in `test/fixtures/` before any model

@@ -106,10 +106,10 @@ export function createServer(deps: ServerDeps): McpServer {
       description:
         "Lists the members currently at one area, by area_id or area_name, in one group or " +
         "across every group when group_id is omitted. Lists only members who've chosen to be " +
-        "visible to assistants. If `undisclosed_note` is present, others may be there too: " +
-        "report the list as \"confirmed here\", not as everyone. " +
+        "visible to assistants. If `undisclosed_note` or `count_note` is present, others may be " +
+        "there too: report the list as \"confirmed here\", not as everyone. " +
         "Returns {status: \"ok\", area, group_id, group_name, members: [nickname…], " +
-        "undisclosed_note?} or {status: \"unknown\", reason: \"no_such_area\"}.",
+        "undisclosed_note?, count_note?} or {status: \"unknown\", reason: \"no_such_area\"}.",
       inputSchema: {
         area_id: z.string().optional().describe("Area ID from list_areas. Preferred when known."),
         area_name: z.string().optional().describe("Area name, case-insensitive. Used when area_id is omitted."),
