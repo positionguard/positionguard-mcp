@@ -30,7 +30,10 @@ test("list_areas strips counts and tags each area with its group; never calls /a
   const { c, calls } = client();
   const r = await listAreas(c, { group_id: FAMILY });
   assert.equal(r.status, "ok");
-  assert.deepEqual(r.areas[0], { area_id: SKATEPARK, name: "Skatepark", group_id: FAMILY, group_name: "Family" });
+  assert.deepEqual(
+    r.areas.find((a) => a.area_id === SKATEPARK),
+    { area_id: SKATEPARK, name: "Skatepark", group_id: FAMILY, group_name: "Family" },
+  );
   for (const a of r.areas) assert.ok(!("member_count" in a));
   assert.ok(calls.every((p) => !/\/areas$/.test(p)), `called: ${calls.join(", ")}`);
 });
@@ -108,18 +111,22 @@ test("where_is_member: Ghost-joined member of a public group (captured roster) -
   if (all.status === "at_area") assert.equal(all.group_name, "Family");
 });
 
-test("who_is_at_area: public group (captured roster) -> only the rows served; a Ghost-joined member is never listed", async () => {
-  // Nobody was inside the park at capture time, so every served row is
-  // inside: false and counts as withheld (public rosters carry no safety
-  // block, so away and withheld are one shape). The note counts the three
-  // rows served: Anonymous, MikeL, PositionGuard. Newman is not among them.
+test("who_is_at_area: public group (captured roster and count) -> the masked member listed as \"Anonymous\", the Ghost-joined member counted but never listed", async () => {
+  // Newman (Ghost-joined) and EarlonDev (anonymous-joined) were both inside
+  // the park: the count says 2, the roster lists one row at the area, under
+  // the mask, and has no row for Newman. MikeL's row is the withheld shape.
+  // One listed, one withheld, two counted — and the answer says all three.
   const { c } = client();
   const r = await whoIsAtArea(c, { group_id: PUBLIC, area_name: "Marymoor Dog Park" });
   assert.equal(r.status, "ok");
   if (r.status === "ok") {
-    assert.deepEqual(r.members, []);
-    assert.match(r.undisclosed_note!, /^3 members/);
-    for (const n of ["Newman", "Anonymous", "MikeL", "PositionGuard"]) assert.ok(!r.undisclosed_note!.includes(n));
+    assert.deepEqual(r.members, ["Anonymous"]);
+    assert.match(r.undisclosed_note!, /^1 member /);
+    assert.match(r.count_note!, /^2 counted at this area, 1 listed\./);
+    for (const n of ["Newman", "EarlonDev", "MikeL"]) {
+      assert.ok(!r.undisclosed_note!.includes(n));
+      assert.ok(!r.count_note!.includes(n));
+    }
   }
 });
 
@@ -164,7 +171,7 @@ test("where_is_member: unique partial match is accepted, ambiguous is not", asyn
   const r = await whereIsMember(c, { nickname: "newm" });
   assert.equal(r.status, "at_area");
   assert.equal(r.nickname, "Newman");
-  // "n" matches Newman, John, EarlonDev, Anonymous and PositionGuard: genuinely ambiguous.
+  // "n" matches Newman, John, EarlonDev and Anonymous: genuinely ambiguous.
   const amb = await whereIsMember(c, { nickname: "n" });
   assert.equal(amb.status, "unknown");
   assert.equal(amb.reason, "no_such_member");
@@ -314,16 +321,71 @@ test("count_members_at_area: captured Skatepark with Newman stale -> 2/1/0 and '
   }
 });
 
-test("count_members_at_area: stale present (derived multi-area example) -> floor note", async () => {
-  const { c } = client();
-  const r = await countMembersAtArea(c, { area_name: "Home", group_id: FAMILY });
-  if (r.status === "ok") assert.match(r.note, /at least 2/);
-  else assert.fail(r.status);
+test("count_members_at_area: public group with a member consent-off inside (captured) -> 1/0/1 and 'at least 1'", async () => {
+  // EarlonDev switched agent access off while inside the park: the count
+  // moved him from member_count to undisclosed_count. Newman, Ghost-joined
+  // and inside, is the one still counted.
+  const routes = defaultRoutes();
+  routes[`/groups/${PUBLIC}/area-counts`] = { status: 200, body: fixture("area_counts.public_group.undisclosed.json") };
+  const { c } = client(routes);
+  const r = await countMembersAtArea(c, { group_id: PUBLIC, area_name: "Marymoor Dog Park" });
+  assert.equal(r.status, "ok");
+  if (r.status === "ok") {
+    assert.deepEqual([r.member_count, r.stale_count, r.undisclosed_count], [1, 0, 1]);
+    assert.match(r.note, /at least 1/);
+  }
 });
 
-test("count_members_at_area: all disclosed and fresh -> exact", async () => {
+test("who_is_at_area: public group with the masked member consent-off (captured) -> nobody listed, one withheld, one counted", async () => {
+  // Same moment as area_counts.public_group.undisclosed.json: EarlonDev's
+  // masked row is now the withheld shape (identity + inside: false), so the
+  // mask and the consent gate compose — neither his name nor his presence
+  // is on the wire — while Newman is counted with no row.
+  const routes = defaultRoutes();
+  routes[`/groups/${PUBLIC}/members`] = { status: 200, body: fixture("members.consent_off.public_group.json") };
+  routes[`/groups/${PUBLIC}/area-counts`] = { status: 200, body: fixture("area_counts.public_group.undisclosed.json") };
+  const { c } = client(routes);
+  const r = await whoIsAtArea(c, { group_id: PUBLIC, area_name: "Marymoor Dog Park" });
+  assert.equal(r.status, "ok");
+  if (r.status === "ok") {
+    assert.deepEqual(r.members, []);
+    assert.match(r.undisclosed_note!, /^1 member /);
+    assert.match(r.count_note!, /^1 counted at this area, none listed\./);
+  }
+});
+
+test("public group with the masked member stale inside (captured): where_is_member and who_is_at_area say unknown, count says 'at least 2'", async () => {
+  // Same moment: EarlonDev's masked row is inside: true with current_area
+  // and safety_status "stale"; the count is 2/1/0 (Newman, Ghost-joined
+  // and still fresh, plus EarlonDev stale). No tool presents the stale
+  // last-known position as presence, and the count says it is a floor.
+  const routes = defaultRoutes();
+  routes[`/groups/${PUBLIC}/members`] = { status: 200, body: fixture("members.stale.public_group.json") };
+  routes[`/groups/${PUBLIC}/area-counts`] = { status: 200, body: fixture("area_counts.public_group.stale.json") };
+  const { c } = client(routes);
+
+  const w = await whereIsMember(c, { nickname: "Anonymous", group_id: PUBLIC });
+  assert.deepEqual(w, { status: "unknown", reason: "stale", nickname: "Anonymous" });
+
+  const who = await whoIsAtArea(c, { group_id: PUBLIC, area_name: "Marymoor Dog Park" });
+  assert.equal(who.status, "ok");
+  if (who.status === "ok") {
+    assert.deepEqual(who.members, []);
+    assert.match(who.undisclosed_note!, /^1 member /);
+    assert.match(who.count_note!, /^2 counted at this area, none listed\./);
+  }
+
+  const n = await countMembersAtArea(c, { group_id: PUBLIC, area_name: "Marymoor Dog Park" });
+  assert.equal(n.status, "ok");
+  if (n.status === "ok") {
+    assert.deepEqual([n.member_count, n.stale_count, n.undisclosed_count], [2, 1, 0]);
+    assert.match(n.note, /at least 2/);
+  }
+});
+
+test("count_members_at_area: all disclosed and fresh (captured Safeway, nobody inside) -> exact", async () => {
   const { c } = client();
-  const r = await countMembersAtArea(c, { area_name: "School" });
+  const r = await countMembersAtArea(c, { area_name: "Safeway" });
   if (r.status === "ok") {
     assert.equal(r.member_count, 0);
     assert.match(r.note, /exact/);
@@ -344,12 +406,12 @@ test("count_members_at_area: counts absent (the withheld shape, captured from a 
   }
 });
 
-test("count_members_at_area: public group, counts served (captured) -> ok with real zeros, not count_unavailable", async () => {
+test("count_members_at_area: public group, counts served (captured) -> 2/0/0, one of them Ghost-joined and on no roster", async () => {
   const { c } = client();
   const r = await countMembersAtArea(c, { group_id: PUBLIC, area_name: "Marymoor Dog Park" });
   assert.equal(r.status, "ok");
   if (r.status === "ok") {
-    assert.deepEqual([r.member_count, r.stale_count, r.undisclosed_count], [0, 0, 0]);
+    assert.deepEqual([r.member_count, r.stale_count, r.undisclosed_count], [2, 0, 0]);
     assert.match(r.note, /exact/);
   }
 });

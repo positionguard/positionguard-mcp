@@ -18,7 +18,7 @@ export const EVENT = "00000000-0000-4000-8000-f6177b48ca28"; // holds Newman's g
 export const FRIENDS = "00000000-0000-4000-8000-0aaaa555fdd7"; // holds Newman's consent-off row
 export const PUBLIC = "00000000-0000-4000-8000-4108066fb6b0"; // "Dog Park @ Marymoor", group_type public
 export const GYM = "00000000-0000-4000-8000-ae78a59cc7e0"; // "Team 425 gym", group_type public
-export const SKATEPARK = "00000000-0000-4000-8000-8dd8d8268acd"; // area of "Team 🛹 Skateboard"; the derived Family fixtures reuse it
+export const SKATEPARK = "00000000-0000-4000-8000-8dd8d8268acd"; // area of "Team 🛹 Skateboard"; Family serves that group's captured counts, so it shares it
 
 // A route table for a fake PositionGuard API: path → status + body, or a
 // function for stateful behaviour. Paths are relative to /api/v1.
@@ -52,7 +52,10 @@ export function defaultRoutes(): Routes {
   return {
     "/groups": { status: 200, body: fixture("groups.json") },
     [`/groups/${FAMILY}/members`]: { status: 200, body: family },
-    [`/groups/${FAMILY}/area-counts`]: { status: 200, body: fixture("area_counts.json") },
+    // Family's counts are the Skateboard group's captured undisclosed counts:
+    // the Skatepark row (1/0/1) matches Family's roster above, Newman at the
+    // Skatepark and one of the withheld two inside it; Safeway is a real 0.
+    [`/groups/${FAMILY}/area-counts`]: { status: 200, body: fixture("area_counts.skateboard.undisclosed.json") },
     [`/groups/${SKATE}/members`]: { status: 200, body: skate },
     [`/groups/${SKATE}/area-counts`]: { status: 200, body: fixture("area_counts.skateboard.stale.json") },
     [`/groups/${CONSENT}/members`]: { status: 200, body: consent },
