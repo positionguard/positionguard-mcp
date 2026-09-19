@@ -70,6 +70,13 @@ async function callAll(client: Client): Promise<void> {
   );
   const where = tools.tools.find((t) => t.name === "where_is_member")!;
   assert.match(where.description!, /`unknown` means you don't know; it does not mean they're away\./);
+  // A last-known answer is relayed with its age, never as current presence.
+  for (const name of ["where_is_member", "who_is_at_area"]) {
+    const d = tools.tools.find((t) => t.name === name)!.description!;
+    assert.match(d, /must be relayed with its age .* never as where they are now\./, name);
+  }
+  assert.match(where.description!, /`since` is when they entered the area/);
+  assert.match(tools.tools.find((t) => t.name === "count_members_at_area")!.description!, /not recently confirmed/);
   assert.equal(where.annotations?.readOnlyHint, true);
 
   const r1 = await client.callTool({ name: "where_is_member", arguments: { nickname: "John" } });

@@ -19,6 +19,13 @@ const UNKNOWN_RULE =
   "`unknown` means you don't know; it does not mean they're away. Say so. " +
   "Never present an unknown as an absence, and never guess a location.";
 
+// The area hold: the server keeps a silent member at the area they were
+// last confirmed in. That is a last-known place with an age, and the model
+// must never turn it into present tense.
+const LAST_KNOWN_RULE =
+  "A last-known result (`last_known_at_area`, or a name in `last_known`) must be relayed with " +
+  "its age — e.g. \"last confirmed at Lake House 10 h ago\" — never as where they are now.";
+
 const READ_ONLY = {
   readOnlyHint: true,
   destructiveHint: false,
@@ -40,7 +47,9 @@ export function createServer(deps: ServerDeps): McpServer {
         "named areas (home, school, the club), never coordinates. Members choose whether " +
         "assistants may see them. A `status` of `unknown` means the member has not made their " +
         "presence visible to assistants, or their last report is too old: it is not evidence " +
-        "that they are away. Counts are floors when undisclosed_count or stale_count is non-zero.",
+        "that they are away. `last_known_at_area` means the member was last confirmed at that area " +
+        "but nothing newer has arrived: relay it with its age, never as current presence. Counts " +
+        "are floors when undisclosed_count or stale_count is non-zero.",
     },
   );
 
@@ -84,12 +93,16 @@ export function createServer(deps: ServerDeps): McpServer {
         "nickname (case-insensitive) in the given group, or in every group when group_id is " +
         "omitted. Returns one of:\n" +
         "  {status: \"at_area\", area: {area_id, name}, since}  — they are at that area now;\n" +
+        "  {status: \"last_known_at_area\", area, since, position_fresh: false, last_confirmed_seconds_ago, note}  — " +
+        "they were last confirmed at that area that long ago and have no newer position; relay the note, with the age;\n" +
         "  {status: \"not_at_area\"}  — their presence is shared with assistants and they are not at any of the group's areas;\n" +
         "  {status: \"unknown\", reason}  — see below.\n" +
         "Returns `unknown` when the member hasn't shared their presence with assistants, or " +
         "their location is stale (reason \"not_disclosed\" or \"stale\"), and with reason " +
         "\"no_such_member\" when no member has that nickname — do not invent one. " +
-        UNKNOWN_RULE,
+        "`since` is when they entered the area, not when their position was last confirmed; " +
+        "`position_fresh` and `position_age_seconds`, when present, say how recent the position is. " +
+        UNKNOWN_RULE + " " + LAST_KNOWN_RULE,
       inputSchema: {
         nickname: z.string().min(1).describe("The member's nickname as shown in PositionGuard."),
         group_id: z.string().optional().describe("Restrict the search to one group. Omit to search every group."),
@@ -104,12 +117,17 @@ export function createServer(deps: ServerDeps): McpServer {
     {
       title: "Who is at an area",
       description:
-        "Lists the members currently at one area, by area_id or area_name, in one group or " +
+        "Lists the members at one area, by area_id or area_name, in one group or " +
         "across every group when group_id is omitted. Lists only members who've chosen to be " +
-        "visible to assistants. If `undisclosed_note` or `count_note` is present, others may be " +
-        "there too: report the list as \"confirmed here\", not as everyone. " +
-        "Returns {status: \"ok\", area, group_id, group_name, members: [nickname…], " +
-        "undisclosed_note?, count_note?} or {status: \"unknown\", reason: \"no_such_area\"}.",
+        "visible to assistants, in two lists that must never be merged: `confirmed` (a recent " +
+        "position inside the area) and `last_known` (last confirmed inside it " +
+        "last_confirmed_seconds_ago seconds ago, nothing newer). If `undisclosed_note` or " +
+        "`count_note` is present, others may be there too: report `confirmed` as \"confirmed " +
+        "here\", not as everyone. `members` repeats `confirmed` for older clients. " +
+        "Returns {status: \"ok\", area, group_id, group_name, confirmed: [nickname…], " +
+        "last_known: [{nickname, last_confirmed_seconds_ago}…], members, last_known_note?, " +
+        "undisclosed_note?, count_note?} or {status: \"unknown\", reason: \"no_such_area\"}. " +
+        LAST_KNOWN_RULE,
       inputSchema: {
         area_id: z.string().optional().describe("Area ID from list_areas. Preferred when known."),
         area_name: z.string().optional().describe("Area name, case-insensitive. Used when area_id is omitted."),
@@ -129,8 +147,10 @@ export function createServer(deps: ServerDeps): McpServer {
         "area_id or area_name, in one group or across every group when group_id is omitted. " +
         "Returns {status: \"ok\", area, group_id, group_name, member_count, stale_count, " +
         "undisclosed_count, note}. `member_count` is a floor: `undisclosed_count` members are " +
-        "at the area but chose not to be visible to assistants, and `stale_count` haven't " +
-        "reported recently. Report the count as 'at least N' when either is non-zero. " +
+        "at the area but chose not to be visible to assistants, and `stale_count` of the counted " +
+        "are not recently confirmed (last known there). Report the count as 'at least N' when " +
+        "either is non-zero, and say how many are not recently confirmed — never present those " +
+        "as there now. " +
         "When the API provides no count (reason \"count_unavailable\") the answer is unknown, " +
         "not zero.",
       inputSchema: {
