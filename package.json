@@ -1,6 +1,6 @@
 {
   "name": "positionguard-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Read-only MCP server over PositionGuard presence. Holds one agent-type API key; answers only what the member agreed to share, and says unknown when they didn't.",
   "license": "MIT",
   "type": "module",

@@ -41,7 +41,8 @@ read exactly what.
   all, and one who joined anonymously is listed as "Anonymous"; the API
   does that before this server sees the roster. The tool descriptions
   tell the model, in so many words, that `unknown` means it doesn't know.
-  A stale last-known position is never returned as a location; counts
+  A stale last-known position is never returned as a current location:
+  it is `unknown`, or `last_known_at_area` with its age (below); counts
   include stale members and say so.
 - **No caching.** The API caches for 15 seconds. A second cache would be a
   second place for a withdrawn consent to lag.
@@ -59,8 +60,8 @@ and are never retried.
 |---|---|---|
 | `list_groups` | `groups:read` | `{status, groups: [{group_id, name, group_type}]}` |
 | `list_areas` | `counts:read` | `{status, areas: [{area_id, name, group_id, group_name}]}` — names only, no counts, no geometry |
-| `where_is_member` | `presence:read` | `{status: "at_area", area, since}` \| `{status: "not_at_area"}` \| `{status: "unknown", reason}` |
-| `who_is_at_area` | `presence:read` | `{status, area, members: [nickname…], undisclosed_note?, count_note?}` — disclosed members only |
+| `where_is_member` | `presence:read` | `{status: "at_area", area, since}` \| `{status: "last_known_at_area", area, since, last_confirmed_seconds_ago, note}` \| `{status: "not_at_area"}` \| `{status: "unknown", reason}` |
+| `who_is_at_area` | `presence:read` | `{status, area, confirmed: [nickname…], last_known: [{nickname, last_confirmed_seconds_ago}…], members, last_known_note?, undisclosed_note?, count_note?}` — disclosed members only |
 | `count_members_at_area` | `counts:read` | `{status, member_count, stale_count, undisclosed_count, note}` |
 
 `where_is_member` looks a nickname up case-insensitively, in one group or
@@ -75,6 +76,20 @@ complete when the count says otherwise. `member_count` is a floor when
 report it as "at least N". When the API provides no count at all (archived
 areas), the answer is `unknown` with reason `count_unavailable`, never
 zero.
+
+**Freshness and last-known answers.** A PositionGuard server can hold a
+member at the area they were last confirmed in while their phone is
+silent, and marks those rows `position_fresh: false` with the position's
+age. `where_is_member` answers them as `last_known_at_area`, with
+`last_confirmed_seconds_ago` and a note ("Last confirmed at Lake House
+10 h ago; no newer position"), never as `at_area`. `who_is_at_area`
+lists them under `last_known`, never under `confirmed`, and
+`count_members_at_area`'s note says how many of the count are not recently
+confirmed. The tool descriptions tell the model to relay a last-known
+answer with its age, never as current presence. `since` is always when
+the member entered the area, not when they were last confirmed. Against
+a server that doesn't send `position_fresh`, answers are what they were in
+0.1.0.
 
 How the wire maps to `status` is written out in `src/core/mapping.ts` and
 tested against captured responses in `test/fixtures/` before any model
