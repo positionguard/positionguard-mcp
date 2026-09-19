@@ -249,12 +249,27 @@ export async function countMembersAtArea(
     };
   }
 
+  // stale_count members are inside member_count, last confirmed here but
+  // with nothing newer (the server holds them at the area). The note puts
+  // the sub-count beside the count in words, so it is relayed with it.
   const floor = a.undisclosed_count > 0 || a.stale_count > 0;
-  const note = floor
-    ? `member_count is a floor: report it as "at least ${a.member_count}". ` +
+  const parts: string[] = [];
+  if (floor) parts.push(`member_count is a floor: report it as "at least ${a.member_count}".`);
+  if (a.stale_count > 0) {
+    parts.push(
+      `${a.undisclosed_count > 0 ? "At least " : ""}${a.member_count} at the area, ` +
+        `${a.stale_count} of them not recently confirmed: say so, and relay ` +
+        `${a.stale_count === 1 ? "that one" : "those"} as last known there, not as present now.`,
+    );
+  }
+  if (a.undisclosed_count > 0) {
+    parts.push(
       `${a.undisclosed_count} member${a.undisclosed_count === 1 ? " is" : "s are"} at the area but ` +
-      "chose not to be visible to assistants, and " +
-      `${a.stale_count} of the counted ${a.stale_count === 1 ? "has" : "have"} not reported recently.`
+        "chose not to be visible to assistants.",
+    );
+  }
+  const note = floor
+    ? parts.join(" ")
     : "Every member the server places at this area is disclosed and fresh; the count is exact.";
 
   return {

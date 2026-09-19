@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PositionGuardClient } from "../src/core/client.js";
 import { formatAge, memberStatus, mergeStatuses } from "../src/core/mapping.js";
-import { whereIsMember, whoIsAtArea } from "../src/core/tools.js";
+import { countMembersAtArea, whereIsMember, whoIsAtArea } from "../src/core/tools.js";
 import type { WireMember } from "../src/core/types.js";
 import { captureLog, defaultRoutes, fakeFetch, FAMILY, fixture, PUBLIC, type Routes } from "./helpers.js";
 
@@ -177,4 +177,28 @@ test("public roster: a held member narrowed to stale is unknown in where_is_memb
     assert.deepEqual(who.confirmed, []);
     assert.deepEqual(who.last_known, []);
   } else assert.fail(who.status);
+});
+
+test("count_members_at_area: held member -> 'N at the area, M of them not recently confirmed', sub-count kept", async () => {
+  const r = await countMembersAtArea(client(heldWorld()), { group_id: FAMILY, area_name: "Lake House" });
+  assert.equal(r.status, "ok");
+  if (r.status === "ok") {
+    assert.deepEqual([r.member_count, r.stale_count, r.undisclosed_count], [1, 1, 0]);
+    assert.match(r.note, /at least 1/);
+    assert.match(r.note, /1 at the area, 1 of them not recently confirmed/);
+    assert.ok(!r.note.includes("0 members"), "no clause for an empty bucket");
+  }
+});
+
+test("count_members_at_area: stale and undisclosed together -> 'At least N at the area, M of them not recently confirmed'", async () => {
+  const routes = heldWorld();
+  routes[`/groups/${FAMILY}/area-counts`] = {
+    status: 200,
+    body: [{ ...fixture<object[]>("area_counts.held.json")[0], member_count: 3, stale_count: 1, undisclosed_count: 2 }],
+  };
+  const r = await countMembersAtArea(client(routes), { group_id: FAMILY, area_name: "Lake House" });
+  if (r.status === "ok") {
+    assert.match(r.note, /At least 3 at the area, 1 of them not recently confirmed/);
+    assert.match(r.note, /2 members are at the area but chose not to be visible/);
+  } else assert.fail(r.status);
 });
