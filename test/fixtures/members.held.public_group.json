@@ -1,0 +1,15 @@
+[
+  {
+    "user_id": "00000000-0000-4000-8000-90d73999060c",
+    "nickname": "Anonymous",
+    "inside": true,
+    "current_area": {
+      "id": "00000000-0000-4000-8000-4faadba51390",
+      "name": "Marymoor Dog Park"
+    },
+    "last_update": "2026-09-18T21:04:12.518204Z",
+    "safety_status": "stale",
+    "position_age_seconds": 36000,
+    "position_fresh": false
+  }
+]

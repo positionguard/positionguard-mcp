@@ -36,6 +36,10 @@ export interface WireMember {
   safety_status?: "at_area" | "in_zone" | "out_of_zone" | "stale" | string;
   safety_area?: string;
   position_age_seconds?: number;
+  // Sent beside safety_status by servers that hold at_area through a
+  // phone's silence (SAFETY_STATUS_AREA_HOLD). false = the status rests on a
+  // position older than the stale window. Older servers never send it.
+  position_fresh?: boolean;
 }
 
 // One entry from GET /groups/{id}/area-counts. Coordinate-free by contract.

@@ -98,10 +98,10 @@ export async function whereIsMember(
   const first = matches[0]!;
   const merged = mergeStatuses(matches.map((m) => memberStatus(m.row)));
   const out: WhereIsMemberResult = { ...merged, nickname: first.row.nickname ?? query };
-  if (merged.status === "at_area") {
+  if (merged.status === "at_area" || merged.status === "last_known_at_area") {
     // Name the group whose area answered, so a follow-up who_is_at_area can
     // be asked precisely.
-    const src = matches.find((m) => memberStatus(m.row).status === "at_area") ?? first;
+    const src = matches.find((m) => memberStatus(m.row).status === merged.status) ?? first;
     out.group_id = src.group.id;
     out.group_name = src.group.name;
   }
@@ -122,7 +122,14 @@ export type WhoIsAtAreaResult =
       area: { area_id: string; name: string };
       group_id: string;
       group_name: string;
+      // Fresh: the server has a recent position inside this area.
+      confirmed: string[];
+      // Held: last confirmed inside this area, nothing newer since. Never
+      // merged into `confirmed`.
+      last_known: { nickname: string; last_confirmed_seconds_ago: number }[];
+      // The same list as `confirmed`, kept for clients written against 0.1.0.
       members: string[];
+      last_known_note?: string;
       undisclosed_note?: string;
       count_note?: string;
     }
@@ -134,11 +141,17 @@ export async function whoIsAtArea(client: PositionGuardClient, args: AreaArgs): 
 
   const members = await client.listMembers(resolved.group.id);
   const present: string[] = [];
+  const lastKnown: { nickname: string; last_confirmed_seconds_ago: number }[] = [];
   let unknownRows = 0;
   for (const row of members) {
     const s = memberStatus(row);
     if (s.status === "at_area" && s.area.area_id === resolved.area.area_id) {
       present.push(row.nickname ?? "(unnamed member)");
+    } else if (s.status === "last_known_at_area" && s.area.area_id === resolved.area.area_id) {
+      lastKnown.push({
+        nickname: row.nickname ?? "(unnamed member)",
+        last_confirmed_seconds_ago: s.last_confirmed_seconds_ago,
+      });
     } else if (s.status === "unknown") {
       unknownRows++;
     }
@@ -149,8 +162,17 @@ export async function whoIsAtArea(client: PositionGuardClient, args: AreaArgs): 
     area: { area_id: resolved.area.area_id, name: resolved.area.area_name },
     group_id: resolved.group.id,
     group_name: resolved.group.name,
+    confirmed: present,
+    last_known: lastKnown,
     members: present,
   };
+  if (lastKnown.length > 0) {
+    const one = lastKnown.length === 1;
+    out.last_known_note =
+      `${lastKnown.length} member${one ? " was" : "s were"} last confirmed here but ` +
+      `${one ? "has" : "have"} no newer position. Relay each with its age ` +
+      "(last_confirmed_seconds_ago), as last known here, never as present now.";
+  }
   if (unknownRows > 0) {
     out.undisclosed_note =
       `${unknownRows} member${unknownRows === 1 ? "" : "s"} of this group ` +
@@ -165,7 +187,7 @@ export async function whoIsAtArea(client: PositionGuardClient, args: AreaArgs): 
   // Ghost-joined member and, above its member limit, no row but the caller's
   // own; a private group keeps a stale member's row, which is not listed.
   const counted = resolved.area.member_count;
-  const listed = present.length;
+  const listed = present.length + lastKnown.length;
   if (counted !== undefined && counted > listed) {
     out.count_note =
       `${counted} counted at this area, ${listed === 0 ? "none" : listed} listed. ` +

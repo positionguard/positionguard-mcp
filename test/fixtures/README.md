@@ -34,6 +34,12 @@ here. That is where `unknown` is proven before any model sees the server.
 | `members.sharing_off.integration_key.json` | the same two members, seen by an **integration** key | `unknown` | captured 2026-09-06 (api02, integration key) |
 | `members.stale.json` | Newman: consent on, still inside Skatepark, app force-stopped until his last position was older than the stale window (50 minutes on api02, per the safety-status runbook) | `unknown` (reason `stale`) | captured 2026-09-06 (api02, Assistant key) |
 | `members.stale.public_group.json` | EarlonDev: anonymous-joined, consent on, still inside Marymoor Dog Park, simulator stopped until past the stale window. The masked row keeps `inside: true` and `current_area` and carries `safety_status: "stale"` with `position_age_seconds` — the public-roster staleness signal — and no `safety_area`. Before backend `825f642` this row was byte-identical to a fresh one | `unknown` (reason `stale`) | captured 2026-09-08 (api02, Assistant key) |
+| `members.fresh_at_area.json` | Newman inside Skatepark, fresh, on a server that sends `position_fresh` (`true`) | `at_area` with `position_fresh` and `position_age_seconds` | **synthetic**: `members.disclosed_at_area.json` plus `position_fresh: true` |
+| `members.held_at_area.json` | Newman held at "Lake House" by the area hold: `safety_status: "at_area"`, `position_fresh: false`, `position_age_seconds: 36000` | `last_known_at_area` | **synthetic**, per the REST wire contract of `SAFETY_STATUS_AREA_HOLD` (backend `internal/rest/rest.go` `memberResp`); area ID and name are placeholders |
+| `members.held_away.json` | Newman held at an area that is not one of this group's: `inside: false`, `safety_status: "at_area"`, `position_fresh: false` | `unknown` (reason `stale`) | **synthetic**, same contract |
+| `members.stale_away.json` | Newman stale outside any area: `inside: false`, `safety_status: "stale"`, `position_fresh: false` | `unknown` (reason `stale`) | **synthetic**, same contract |
+| `members.held.public_group.json` | EarlonDev held inside Marymoor Dog Park, seen through the public group: the public narrowing turns the hold back into `"stale"` with its age and `position_fresh: false` | `unknown` (reason `stale`) | **synthetic**, per `publicGroupSafety` (backend `internal/rest/rest.go`) |
+| `area_counts.held.json` | "Lake House" with the held Newman: counted, and in `stale_count` | floor, "at least 1"; "1 at the area, 1 of them not recently confirmed" | **synthetic**, placeholder area |
 | `area_counts.skateboard.disclosed.json` | Team 🛹 Skateboard with two disclosed members at Skatepark | exact count | captured 2026-09-06 (api02, Assistant key) |
 | `area_counts.skateboard.undisclosed.json` | same group after Newman switched agent access off: he moves from `member_count` to `undisclosed_count` | floor, "at least 1" | captured 2026-09-06 (api02, Assistant key) |
 | `area_counts.skateboard.stale.json` | same group with Newman stale: still in `member_count`, now also in `stale_count` | floor, "at least 2" | captured 2026-09-06 (api02, Assistant key) |
@@ -46,7 +52,10 @@ here. That is where `unknown` is proven before any model sees the server.
 
 **Provenance.** Every file is *captured*: `npm run capture -- <group_id>`
 output, saved verbatim, a roster file trimmed to the rows of the member
-whose state it holds. Nothing here was written from the API's rendering
+whose state it holds. The exceptions are the six freshness files marked
+**synthetic** above: the area hold was not capturable from this machine, so
+they are written to the wire contract and should be replaced by captures
+from api02 with the hold on. Nothing here was written from the API's rendering
 code; the last such file, a multi-area floor example, was replaced by the
 public-group floor capture on 2026-09-08.
 
