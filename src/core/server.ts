@@ -26,6 +26,15 @@ const LAST_KNOWN_RULE =
   "A last-known result (`last_known_at_area`, or a name in `last_known`) must be relayed with " +
   "its age — e.g. \"last confirmed at Lake House 10 h ago\" — never as where they are now.";
 
+// `inside_areas` is a list of what was disclosed, not of everything true: a
+// member can be visible to assistants at one area and withheld at the one
+// around it, and the row arrives with the shorter list and nothing marking
+// the omission. The list is as ambiguous as the roster, for the same reason.
+const INSIDE_AREAS_RULE =
+  "An area missing from a member's `inside_areas` is not evidence that the member is outside it: members can " +
+  "hide individual areas from assistants, and nothing marks the omission. For an area that is " +
+  "not listed, the answer is unknown, not no.";
+
 const READ_ONLY = {
   readOnlyHint: true,
   destructiveHint: false,
@@ -49,7 +58,8 @@ export function createServer(deps: ServerDeps): McpServer {
         "presence visible to assistants, or their last report is too old: it is not evidence " +
         "that they are away. `last_known_at_area` means the member was last confirmed at that area " +
         "but nothing newer has arrived: relay it with its age, never as current presence. Counts " +
-        "are floors when undisclosed_count or stale_count is non-zero.",
+        "are floors when undisclosed_count or stale_count is non-zero. " +
+        INSIDE_AREAS_RULE,
     },
   );
 
@@ -92,16 +102,23 @@ export function createServer(deps: ServerDeps): McpServer {
         "Reports whether one member is currently at a named area. Looks the member up by " +
         "nickname (case-insensitive) in the given group, or in every group when group_id is " +
         "omitted. Returns one of:\n" +
-        "  {status: \"at_area\", area: {area_id, name}, since}  — they are at that area now;\n" +
-        "  {status: \"last_known_at_area\", area, since, position_fresh: false, last_confirmed_seconds_ago, note}  — " +
+        "  {status: \"at_area\", area: {area_id, name}, inside_areas?, since?}  — they are at that area now;\n" +
+        "  {status: \"last_known_at_area\", area, inside_areas?, since?, position_fresh: false, last_confirmed_seconds_ago, note}  — " +
         "they were last confirmed at that area that long ago and have no newer position; relay the note, with the age;\n" +
         "  {status: \"not_at_area\"}  — their presence is shared with assistants and they are not at any of the group's areas;\n" +
         "  {status: \"unknown\", reason}  — see below.\n" +
         "Returns `unknown` when the member hasn't shared their presence with assistants, or " +
         "their location is stale (reason \"not_disclosed\" or \"stale\"), and with reason " +
         "\"no_such_member\" when no member has that nickname — do not invent one. " +
+        "`area` is the most specific area they are in. `inside_areas`, when present, lists every " +
+        "area of the group they are in that is shared with assistants, most specific first (a home " +
+        "inside a city lists both): use it to answer whether they are in a larger area. " +
+        INSIDE_AREAS_RULE + " " +
         "`since` is when they entered the area, not when their position was last confirmed; " +
         "`position_fresh` and `position_age_seconds`, when present, say how recent the position is. " +
+        "Duration is not available when the reported area is not the API's current_area for the " +
+        "member, so no `since` is given for it: when `since` is absent, do not say how long they " +
+        "have been there. " +
         UNKNOWN_RULE + " " + LAST_KNOWN_RULE,
       inputSchema: {
         nickname: z.string().min(1).describe("The member's nickname as shown in PositionGuard."),
@@ -121,9 +138,13 @@ export function createServer(deps: ServerDeps): McpServer {
         "across every group when group_id is omitted. Lists only members who've chosen to be " +
         "visible to assistants, in two lists that must never be merged: `confirmed` (a recent " +
         "position inside the area) and `last_known` (last confirmed inside it " +
-        "last_confirmed_seconds_ago seconds ago, nothing newer). If `undisclosed_note` or " +
+        "last_confirmed_seconds_ago seconds ago, nothing newer). A member inside a smaller area " +
+        "within this one (a home inside a city) is listed here too. If `undisclosed_note` or " +
         "`count_note` is present, others may be there too: report `confirmed` as \"confirmed " +
-        "here\", not as everyone. `members` repeats `confirmed` for older clients. " +
+        "here\", not as everyone. `count_note` compares everyone the server counts at the area, " +
+        "including members present but not disclosed to assistants, with the names listed; when " +
+        "it is present, never report the list as complete. " +
+        "`members` repeats `confirmed` for older clients. " +
         "Returns {status: \"ok\", area, group_id, group_name, confirmed: [nickname…], " +
         "last_known: [{nickname, last_confirmed_seconds_ago}…], members, last_known_note?, " +
         "undisclosed_note?, count_note?} or {status: \"unknown\", reason: \"no_such_area\"}. " +

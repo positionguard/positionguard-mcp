@@ -20,6 +20,12 @@ export const PUBLIC = "00000000-0000-4000-8000-4108066fb6b0"; // "Dog Park @ Mar
 export const GYM = "00000000-0000-4000-8000-ae78a59cc7e0"; // "Team 425 gym", group_type public
 export const SKATEPARK = "00000000-0000-4000-8000-8dd8d8268acd"; // area of "Team 🛹 Skateboard"; Family serves that group's captured counts, so it shares it
 
+// The nested group of fixtures/groups.nested.json: a small "Home" inside a
+// large "Los Angeles", seen by a key of its own (see fixtures/README.md).
+export const NESTED = "00000000-0000-4000-8000-fdfb25ed227c"; // "Nested Test Group"
+export const HOME = "00000000-0000-4000-8000-13c552d66e1b"; // the inner area
+export const LOS_ANGELES = "00000000-0000-4000-8000-2f3dcd1173f9"; // the outer area
+
 // A route table for a fake PositionGuard API: path → status + body, or a
 // function for stateful behaviour. Paths are relative to /api/v1.
 export type Route = { status: number; body?: unknown; headers?: Record<string, string> };
@@ -67,6 +73,17 @@ export function defaultRoutes(): Routes {
     [`/groups/${PUBLIC}/members`]: { status: 200, body: park },
     [`/groups/${PUBLIC}/area-counts`]: { status: 200, body: fixture("area_counts.public_group.json") },
     [`/groups/${GYM}/members`]: { status: 200, body: gym },
+  };
+}
+
+// The nested world, as captured: one group, its whole roster and its counts
+// from the same moment. "nested" is everyone disclosed everywhere;
+// "nested.outer_withheld" is Ana withheld from assistants at Los Angeles.
+export function nestedRoutes(state: "nested" | "nested.outer_withheld"): Routes {
+  return {
+    "/groups": { status: 200, body: fixture("groups.nested.json") },
+    [`/groups/${NESTED}/members`]: { status: 200, body: fixture(`members.${state}.json`) },
+    [`/groups/${NESTED}/area-counts`]: { status: 200, body: fixture(`area_counts.${state}.json`) },
   };
 }
 

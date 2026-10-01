@@ -1,0 +1,9 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-fdfb25ed227c",
+    "name": "Nested Test Group",
+    "icon": "person.2.fill",
+    "group_type": "private",
+    "always_share_location": false
+  }
+]

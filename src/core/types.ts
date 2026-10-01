@@ -16,6 +16,13 @@ export interface WireAreaBrief {
   name: string;
 }
 
+// One entry of a roster row's `inside_areas`. The /presence entry shape,
+// {area_id, area_name} — not current_area's {id, name}.
+export interface WireInsideArea {
+  area_id: string;
+  area_name: string;
+}
+
 // One roster row from GET /groups/{id}/members.
 //
 // The load-bearing fact for this server: an agent-type key receives, for any
@@ -31,9 +38,18 @@ export interface WireMember {
   avatar_url?: string;
   inside: boolean;
   current_area?: WireAreaBrief;
+  // Every area of this group the member is inside, innermost first
+  // (ascending radius). Since backend e173e0f; an older server never sends
+  // it. Absent, never empty, on a row inside nothing. current_area is one of
+  // its entries but not necessarily the first: it is the newest state row,
+  // which for nested areas entered together can be the outer one. Each entry
+  // is gated on its own, so an agent key can receive a partial list with
+  // nothing marking the omission: an area missing from it is not evidence
+  // the member is outside that area.
+  inside_areas?: WireInsideArea[];
   last_update?: string; // RFC 3339; when the member entered current_area
   sharing_disabled?: boolean; // integration keys only; withheld from agent keys
-  safety_status?: "at_area" | "in_zone" | "out_of_zone" | "stale" | string;
+  safety_status?: "at_area" | "in_zone" | "out_of_zone" | "fresh" | "stale" | string;
   safety_area?: string;
   position_age_seconds?: number;
   // Sent beside safety_status by servers that hold at_area through a

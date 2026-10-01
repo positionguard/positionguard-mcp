@@ -1,0 +1,79 @@
+[
+  {
+    "user_id": "00000000-0000-4000-8000-2ece884bf5d1",
+    "nickname": "Ana",
+    "inside": true,
+    "current_area": {
+      "id": "00000000-0000-4000-8000-13c552d66e1b",
+      "name": "Home"
+    },
+    "inside_areas": [
+      {
+        "area_id": "00000000-0000-4000-8000-13c552d66e1b",
+        "area_name": "Home"
+      }
+    ],
+    "last_update": "2026-10-01T20:27:03.107134Z",
+    "safety_status": "at_area",
+    "safety_area": "Home",
+    "position_age_seconds": 116,
+    "position_fresh": true
+  },
+  {
+    "user_id": "00000000-0000-4000-8000-335af34ea7bf",
+    "nickname": "Ben",
+    "inside": true,
+    "current_area": {
+      "id": "00000000-0000-4000-8000-2f3dcd1173f9",
+      "name": "Los Angeles"
+    },
+    "inside_areas": [
+      {
+        "area_id": "00000000-0000-4000-8000-13c552d66e1b",
+        "area_name": "Home"
+      },
+      {
+        "area_id": "00000000-0000-4000-8000-2f3dcd1173f9",
+        "area_name": "Los Angeles"
+      }
+    ],
+    "last_update": "2026-10-01T20:42:03.107546Z",
+    "safety_status": "at_area",
+    "safety_area": "Home",
+    "position_age_seconds": 116,
+    "position_fresh": true
+  },
+  {
+    "user_id": "00000000-0000-4000-8000-d5c4357640e3",
+    "nickname": "Cleo",
+    "inside": true,
+    "current_area": {
+      "id": "00000000-0000-4000-8000-2f3dcd1173f9",
+      "name": "Los Angeles"
+    },
+    "inside_areas": [
+      {
+        "area_id": "00000000-0000-4000-8000-2f3dcd1173f9",
+        "area_name": "Los Angeles"
+      }
+    ],
+    "last_update": "2026-10-01T19:07:03.107134Z",
+    "safety_status": "at_area",
+    "safety_area": "Los Angeles",
+    "position_age_seconds": 116,
+    "position_fresh": true
+  },
+  {
+    "user_id": "00000000-0000-4000-8000-7d8bac7ce475",
+    "nickname": "Dev",
+    "inside": false,
+    "safety_status": "fresh",
+    "position_age_seconds": 116,
+    "position_fresh": true
+  },
+  {
+    "user_id": "00000000-0000-4000-8000-5fe598e33411",
+    "nickname": "Olive",
+    "inside": false
+  }
+]

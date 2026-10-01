@@ -1,0 +1,16 @@
+[
+  {
+    "area_id": "00000000-0000-4000-8000-13c552d66e1b",
+    "area_name": "Home",
+    "member_count": 2,
+    "stale_count": 0,
+    "undisclosed_count": 0
+  },
+  {
+    "area_id": "00000000-0000-4000-8000-2f3dcd1173f9",
+    "area_name": "Los Angeles",
+    "member_count": 3,
+    "stale_count": 0,
+    "undisclosed_count": 0
+  }
+]

@@ -36,7 +36,10 @@ read exactly what.
 - **`unknown` is not "away".** A member who has not opted in, who is in
   global Ghost, who paused sharing, or whose phone has not reported in a
   while all look identical on the wire, and all map to `unknown`; the
-  first three are captured in `test/fixtures/` and asserted identical. A
+  first three are captured in `test/fixtures/` and asserted identical.
+  The same holds per area: a member who is at an area but has hidden that
+  one area from assistants is simply not listed there, and that absence
+  is `unknown` too, never "not there". A
   member who joined a public group in Ghost mode is not on that roster at
   all, and one who joined anonymously is listed as "Anonymous"; the API
   does that before this server sees the roster. The tool descriptions
@@ -60,7 +63,7 @@ and are never retried.
 |---|---|---|
 | `list_groups` | `groups:read` | `{status, groups: [{group_id, name, group_type}]}` |
 | `list_areas` | `counts:read` | `{status, areas: [{area_id, name, group_id, group_name}]}` — names only, no counts, no geometry |
-| `where_is_member` | `presence:read` | `{status: "at_area", area, since}` \| `{status: "last_known_at_area", area, since, last_confirmed_seconds_ago, note}` \| `{status: "not_at_area"}` \| `{status: "unknown", reason}` |
+| `where_is_member` | `presence:read` | `{status: "at_area", area, inside_areas?, since?}` \| `{status: "last_known_at_area", area, inside_areas?, since?, last_confirmed_seconds_ago, note}` \| `{status: "not_at_area"}` \| `{status: "unknown", reason}` |
 | `who_is_at_area` | `presence:read` | `{status, area, confirmed: [nickname…], last_known: [{nickname, last_confirmed_seconds_ago}…], members, last_known_note?, undisclosed_note?, count_note?}` — disclosed members only |
 | `count_members_at_area` | `counts:read` | `{status, member_count, stale_count, undisclosed_count, note}` |
 
@@ -68,14 +71,32 @@ and are never retried.
 across all of them. Its `reason` is `not_disclosed`, `stale`, or
 `no_such_member` (which is an answer, not an error, so the model doesn't
 invent one). `who_is_at_area` adds `count_note` ("N counted at this area,
-M listed") whenever the area's count exceeds the rows it listed: a public
+M listed") whenever the server counts more members at the area than the
+answer lists, where N is `member_count + undisclosed_count`: a public
 group serves no row for a Ghost-joined member and, above its member
-limit, no row but the caller's own, so the list is never presented as
-complete when the count says otherwise. `member_count` is a floor when
-`undisclosed_count` or `stale_count` is non-zero, and the `note` says to
-report it as "at least N". When the API provides no count at all (archived
-areas), the answer is `unknown` with reason `count_unavailable`, never
-zero.
+limit, no row but the caller's own, and a member can be present but not
+disclosed to assistants at that area, so the list is never presented as
+complete when the count says otherwise. When members are undisclosed the
+note says how many, and "do not report the named list as complete".
+`member_count` is a floor when `undisclosed_count` or `stale_count` is
+non-zero, and the `note` says to report it as "at least N". When the API
+provides no count at all (archived areas), the answer is `unknown` with
+reason `count_unavailable`, never zero.
+
+**Areas inside areas.** A group can have a home inside a city. The API
+lists every area of the group a member is inside, innermost first
+(`inside_areas`), and `where_is_member` answers with the innermost as
+`area` and the whole list beside it, so "is Fred in Los Angeles" can be
+answered from the list. `who_is_at_area` matches the area asked about
+against that list, so someone at home is also named for the city.
+Members choose per area what assistants may see: one who shares Home and
+not Los Angeles comes back with a list of Home alone, and nothing marks
+the omission. **An area missing from `inside_areas` is therefore not
+evidence the member is outside it** — the tool description says so — and
+the only trace of the withholding is the city's `undisclosed_count`,
+which is why `count_note` reads it. `since` is given only when the area
+named is the one the API timed the entry for. Against a server that
+doesn't send `inside_areas`, the single `current_area` answers as before.
 
 **Freshness and last-known answers.** A PositionGuard server can hold a
 member at the area they were last confirmed in while their phone is

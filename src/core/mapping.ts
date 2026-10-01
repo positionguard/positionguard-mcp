@@ -18,10 +18,18 @@ import type { WireMember } from "./types.js";
 //
 // `since` on either area status is when the member ENTERED the area, not
 // when their position was last confirmed.
+//
+// `area` is the most specific place the row names: `inside_areas[0]` when
+// the server sends the list (innermost first), `current_area` otherwise.
+// `inside_areas`, when present, is every area of the group the row places
+// the member in, `area` first. It is a list of what was disclosed, not of
+// everything true: each entry is gated on its own, so an area missing from
+// it is not evidence the member is outside that area.
 export type MemberStatus =
   | {
       status: "at_area";
       area: { area_id: string; name: string };
+      inside_areas?: { area_id: string; name: string }[];
       since?: string;
       position_fresh?: true;
       position_age_seconds?: number;
@@ -29,6 +37,7 @@ export type MemberStatus =
   | {
       status: "last_known_at_area";
       area: { area_id: string; name: string };
+      inside_areas?: { area_id: string; name: string }[];
       since?: string;
       position_fresh: false;
       last_confirmed_seconds_ago: number;
@@ -56,6 +65,30 @@ export type MemberStatus =
 //    phone's silence, with the true age beside it. It becomes
 //    last_known_at_area, carrying that age, so no answer states it as now.
 //    `position_fresh` absent (an older server) means exactly today's rule.
+//
+//    A placed row with no safety block at all is at_area, and that is the
+//    contract, not an inference from silence: since the backend decision of
+//    2026-10-01 (docs/runbooks/safety-status.md in PositionGuard-API) a row
+//    that places a member always says when the position is stale, so an
+//    absent block on a placed row means exactly "not stale". It is reachable
+//    by rule on a public roster and on a muted member's row. Three
+//    exceptions, operational rather than semantic:
+//      - SAFETY_STATUS_ENABLED off: REST sends no safety fields on any
+//        answer, while placement still works, so every placed row would read
+//        as present from no data. The only dangerous one; it is on in
+//        production, and the fix is a backend capability flag, not a
+//        heuristic here.
+//      - a failed status computation: logged server-side, fields omitted.
+//      - a sharing or Ghost toggle landing between the server's placement
+//        read and its status read.
+//
+//    The area named is `inside_areas[0]`, the innermost, when the server
+//    sends the list, and `current_area` otherwise (a server before backend
+//    e173e0f). The two can differ: `current_area` is the newest state row,
+//    which for nested areas entered together can be the outer one. `since`
+//    is `last_update`, the entry time of `current_area`, so it is carried
+//    only when the area named is `current_area`; the wire has no entry time
+//    for any other.
 // 4. Not inside is not_at_area only if the row carries something the API
 //    would have withheld from a non-disclosed subject. The withheld row is
 //    identity + `inside: false` and nothing else; a disclosed-away row
@@ -75,7 +108,10 @@ export function memberStatus(row: WireMember): MemberStatus {
     return { status: "unknown", reason: "stale" };
   }
   if (row.inside === true && row.current_area) {
-    const area = { area_id: row.current_area.id, name: row.current_area.name };
+    const current = { area_id: row.current_area.id, name: row.current_area.name };
+    const insideAreas = (row.inside_areas ?? []).map((a) => ({ area_id: a.area_id, name: a.area_name }));
+    const area = insideAreas[0] ?? current;
+    const since = area.area_id === current.area_id ? row.last_update : undefined;
     if (row.position_fresh === false) {
       // A held at_area always carries its age; without one there is nothing
       // to say "last confirmed N ago" with, so it is plain stale.
@@ -91,13 +127,15 @@ export function memberStatus(row: WireMember): MemberStatus {
         note:
           `Last confirmed at ${area.name} ${formatAge(age)} ago; no newer position. ` +
           "Relay this as their last known place with its age, not as where they are now." +
-          (row.last_update !== undefined ? " `since` is when they entered the area, not when they were last confirmed." : ""),
+          (since !== undefined ? " `since` is when they entered the area, not when they were last confirmed." : ""),
       };
-      if (row.last_update !== undefined) held.since = row.last_update;
+      if (insideAreas.length > 0) held.inside_areas = insideAreas;
+      if (since !== undefined) held.since = since;
       return held;
     }
     const out: MemberStatus = { status: "at_area", area };
-    if (row.last_update !== undefined) out.since = row.last_update;
+    if (insideAreas.length > 0) out.inside_areas = insideAreas;
+    if (since !== undefined) out.since = since;
     if (row.position_fresh === true) {
       out.position_fresh = true;
       if (row.position_age_seconds !== undefined) out.position_age_seconds = row.position_age_seconds;
@@ -110,6 +148,22 @@ export function memberStatus(row: WireMember): MemberStatus {
     }
     return { status: "not_at_area" };
   }
+  return { status: "unknown", reason: "not_disclosed" };
+}
+
+// One member, one area: what a status says about `areaId` in particular.
+//
+// A row that places the member at the area — among `inside_areas`, or as
+// `current_area` on a server that sends no list — keeps its status. A row
+// that places the member somewhere else says nothing about this area: the
+// member is either not in it or withheld from this caller there, and the
+// wire deliberately does not say which. That is unknown, never not_at_area.
+// not_at_area stays what rule 4 makes it: a disclosed row inside none of
+// the group's areas.
+export function statusAtArea(status: MemberStatus, areaId: string): MemberStatus {
+  if (status.status !== "at_area" && status.status !== "last_known_at_area") return status;
+  const areas = status.inside_areas ?? [status.area];
+  if (areas.some((a) => a.area_id === areaId)) return status;
   return { status: "unknown", reason: "not_disclosed" };
 }
 

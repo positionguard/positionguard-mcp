@@ -6,7 +6,8 @@ of the member whose state it captures), with IDs redacted to
 `00000000-0000-4000-8000-<12 hex of the ID's SHA-256>` — stable across
 captures, so the same member or area has the same placeholder in every
 file — and `avatar_url` dropped. Nicknames are those of synthetic api02
-test accounts (Newman, Fred, John, EarlonDev, MikeL).
+test accounts (Newman, Fred, John, EarlonDev, MikeL; and Ana, Ben, Cleo,
+Dev, Olive in the nested group).
 
 **Key type of the captures.** Captured files come from an **Assistant**
 (agent-type) key unless the file name says `integration_key`. The wire
@@ -49,6 +50,11 @@ here. That is where `unknown` is proven before any model sees the server.
 | `area_counts.public_group.undisclosed.json` | Dog Park @ Marymoor, same moment as `members.consent_off.public_group.json`: EarlonDev moved from `member_count` to `undisclosed_count`; Newman, Ghost-joined and inside, is the one still counted | floor, "at least 1" | captured 2026-09-08 (api02, Assistant key) |
 | `area_counts.public_group.stale.json` | Dog Park @ Marymoor, same moment as `members.stale.public_group.json`: EarlonDev still in `member_count`, now also in `stale_count`; Newman, Ghost-joined and still fresh, is the other | floor, "at least 2" | captured 2026-09-08 (api02, Assistant key) |
 | `area_counts.public_group.withheld.json` | the same area before the fix: one area, counts absent, never zero. Kept as the withheld shape, which `areaCountResp` still renders for an archived area or a count it could not compute | `count_unavailable` | captured 2026-09-06 (api02, Assistant key), pre-fix wire |
+| `groups.nested.json` | `GET /groups` for the Olive account: one private group, "Nested Test Group", whose small area "Home" lies inside its large area "Los Angeles" | — | captured 2026-10-01 (api02, Assistant key) — see *Nested areas* |
+| `members.nested.json` | the whole Nested Test Group roster, every row with `inside_areas` (backend `e173e0f`): Ana inside both, `current_area` Home; Ben inside both, `current_area` **Los Angeles** while `inside_areas[0]` is Home; Cleo inside Los Angeles only; Dev inside nothing, with a `fresh` safety block and no `inside_areas` key; Olive, the key holder, agent access off, the withheld shape | Ana `at_area` Home, list [Home, Los Angeles]; Ben `at_area` Home, same list, no `since`; Cleo `at_area` Los Angeles; Dev `not_at_area`; Olive `unknown` | captured 2026-10-01 (api02, Assistant key). **Ben's row is synthetic**: its `current_area` ≠ `inside_areas[0]` ordering was built by SQL, not observed |
+| `area_counts.nested.json` | same moment: Home 2/0/0, Los Angeles 3/0/0 — a member inside both is counted in both | exact counts; `who_is_at_area` lists as many as each counts, no `count_note` | captured 2026-10-01 (api02, Assistant key) |
+| `members.nested.outer_withheld.json` | the same roster with Ana withheld from assistants at Los Angeles only: her row keeps `current_area` Home and her safety block, and `inside_areas` is Home alone — nothing marks the omission. The other four rows are as above | Ana `at_area` Home, list [Home]; asked about Los Angeles she is `unknown`, never `not_at_area` | captured 2026-10-01 (api02, Assistant key); Ben's row synthetic, as above |
+| `area_counts.nested.outer_withheld.json` | same moment: Home 2/0/0, Los Angeles 2/0/1 — Ana moved from `member_count` to `undisclosed_count` at the outer area only | Los Angeles: floor, "at least 2"; `who_is_at_area` names Ben and Cleo and says "3 counted at this area, 2 listed" | captured 2026-10-01 (api02, Assistant key) |
 
 **Provenance.** Every file is *captured*: `npm run capture -- <group_id>`
 output, saved verbatim, a roster file trimmed to the rows of the member
@@ -58,6 +64,65 @@ they are written to the wire contract and should be replaced by captures
 from api02 with the hold on. Nothing here was written from the API's rendering
 code; the last such file, a multi-area floor example, was replaced by the
 public-group floor capture on 2026-09-08.
+
+**Provenance of the five `nested` files.** They come from two capture runs
+on api02 against pg02 on 2026-10-01, with an Assistant key held by Olive,
+each run the script's three requests (`/groups`, `/members`,
+`/area-counts`) for "Nested Test Group". There is no Node on api02, so the
+runs used a Python rendition of `scripts/capture-fixtures.ts`; before the
+files were accepted, the script and the rendition were run on the same known
+UUID and gave the same placeholder. Each file is one response from a run,
+saved verbatim and whole — the rosters are not trimmed, because the state
+they capture is the relation between the rows and the counts. The run
+transcripts are not kept in the repo.
+
+- `groups.nested.json`: the `/groups` response of the first run. The second
+  run's was byte-identical and is not kept twice.
+- `members.nested.json`: the `/members` response of the first run, with
+  every member disclosed at every area they are in.
+- `area_counts.nested.json`: the `/area-counts` response of the same run.
+- `members.nested.outer_withheld.json`: the `/members` response of the
+  second run, 44 seconds later by `position_age_seconds`, after Ana was
+  withheld from assistants at Los Angeles and nothing else changed.
+- `area_counts.nested.outer_withheld.json`: the `/area-counts` response of
+  that second run.
+
+The second run's state was set through the API, not by SQL: Ana, in a test
+session, called the GraphQL mutation `setAreaAgentVisible` for the Los
+Angeles area with `visible: false`. It was cleared afterwards with
+`visible: null`, and the roster, counts and groups were confirmed to return
+to the first run's state.
+
+One thing in them was not observed. In both rosters Ben's `current_area`
+(Los Angeles) is not his `inside_areas[0]` (Home): that ordering was built
+by SQL on pg02, not produced by a phone. The responses are the API's real
+rendering of the state the SQL left; the state is what is synthetic.
+
+## Nested areas
+
+"Nested Test Group" is a synthetic private group on api02 (pg02) with two
+areas, a small "Home" inside a large "Los Angeles". It exists for
+`inside_areas`, which lists every area of the group a member is
+inside, innermost first, where `current_area` names one.
+
+- **`inside_areas[0]` is not always `current_area`.** `current_area` is the
+  member's newest state row, and for nested areas entered together that can
+  be the outer one. Ben's row is that case, and it is **synthetic**: the
+  ordering was built by SQL on pg02, not observed from a phone. The response
+  is the API's real rendering of that state. His safety block, computed by
+  nearest centre on a separate code path, reads `at_area` / `Home`: it
+  agrees with `inside_areas[0]` and not with `current_area`, which is why
+  this server names `inside_areas[0]`.
+- **Each entry is gated on its own.** In the `outer_withheld` pair Ana is
+  withheld from assistants at Los Angeles and disclosed at Home. Her row is
+  a disclosed row with a shorter list. The roster cannot show the
+  withholding; only `undisclosed_count` for Los Angeles (1) does, which is
+  why `who_is_at_area` compares `member_count + undisclosed_count` with the
+  names it lists.
+- **A row inside nothing has no `inside_areas` key**, withheld or not
+  (Dev, Olive): absent, never `[]`.
+- Redacted IDs are the same in both states: group `…fdfb25ed227c`, Home
+  `…13c552d66e1b`, Los Angeles `…2f3dcd1173f9`.
 
 ## Global Ghost
 

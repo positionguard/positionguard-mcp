@@ -1,5 +1,5 @@
 import type { PositionGuardClient } from "./client.js";
-import { memberStatus, mergeStatuses, type MemberStatus } from "./mapping.js";
+import { memberStatus, mergeStatuses, statusAtArea, type MemberStatus } from "./mapping.js";
 import type { WireAreaCount, WireGroup, WireMember } from "./types.js";
 
 // Tool handlers: plain async functions from validated arguments to a
@@ -131,6 +131,8 @@ export type WhoIsAtAreaResult =
       members: string[];
       last_known_note?: string;
       undisclosed_note?: string;
+      // Present when the server counts more members at the area (disclosed
+      // or not) than this answer lists.
       count_note?: string;
     }
   | { status: "unknown"; reason: "no_such_area" };
@@ -144,13 +146,19 @@ export async function whoIsAtArea(client: PositionGuardClient, args: AreaArgs): 
   const lastKnown: { nickname: string; last_confirmed_seconds_ago: number }[] = [];
   let unknownRows = 0;
   for (const row of members) {
+    // A member is at this area when it is among the row's inside_areas — or
+    // is its current_area, on a server that sends no list. Matching the list
+    // is what names a member standing in an inner area when the outer one is
+    // asked about. A row placed elsewhere is not counted as withheld here:
+    // that case is the count's to report (count_note, below).
     const s = memberStatus(row);
-    if (s.status === "at_area" && s.area.area_id === resolved.area.area_id) {
+    const here = statusAtArea(s, resolved.area.area_id);
+    if (here.status === "at_area") {
       present.push(row.nickname ?? "(unnamed member)");
-    } else if (s.status === "last_known_at_area" && s.area.area_id === resolved.area.area_id) {
+    } else if (here.status === "last_known_at_area") {
       lastKnown.push({
         nickname: row.nickname ?? "(unnamed member)",
-        last_confirmed_seconds_ago: s.last_confirmed_seconds_ago,
+        last_confirmed_seconds_ago: here.last_confirmed_seconds_ago,
       });
     } else if (s.status === "unknown") {
       unknownRows++;
@@ -181,19 +189,51 @@ export async function whoIsAtArea(client: PositionGuardClient, args: AreaArgs): 
       "This list is who is confirmed here, not everyone who is here.";
   }
 
-  // The area's count rode along on the call that resolved the area. When it
+  // The area's counts rode along on the call that resolved the area. Everyone
+  // the server places here is member_count + undisclosed_count; when that
   // exceeds the rows listed, the roster is not the whole answer and the list
-  // must not be presented as one: a public group serves no row for a
-  // Ghost-joined member and, above its member limit, no row but the caller's
-  // own; a private group keeps a stale member's row, which is not listed.
+  // must not be presented as one. Two ways to be counted and not listed:
+  //
+  //   - inside member_count: a public group serves no row for a Ghost-joined
+  //     member and, above its member limit, no row but the caller's own; a
+  //     private group keeps a stale member's row, which is not listed.
+  //   - undisclosed_count: present, and withheld from assistants here. For an
+  //     agent key member_count already excludes them, so comparing it alone
+  //     with the roster cannot see a member disclosed at an inner area and
+  //     withheld at this one — their row is a disclosed row, placed elsewhere.
+  //
+  // The three counts are present together or absent together. Absent is
+  // unknown, never zero: with no member_count there is nothing to compare,
+  // and a member_count without an undisclosed_count cannot vouch that the
+  // list is complete.
   const counted = resolved.area.member_count;
+  const undisclosed = resolved.area.undisclosed_count;
   const listed = present.length + lastKnown.length;
-  if (counted !== undefined && counted > listed) {
-    out.count_note =
-      `${counted} counted at this area, ${listed === 0 ? "none" : listed} listed. ` +
-      "The rest are counted without being listed: they joined the group in Ghost mode, the roster " +
-      "is capped, or their last report is not fresh. " +
-      "Report the list as who is confirmed here, not as everyone who is here.";
+  if (counted !== undefined) {
+    const total = counted + (undisclosed ?? 0);
+    if (total > listed || undisclosed === undefined) {
+      const unlisted = counted - listed;
+      const withheld = undisclosed !== undefined && undisclosed > 0;
+      let note = `${total} counted at this area, ${listed === 0 ? "none" : listed} listed. `;
+      if (unlisted > 0) {
+        note +=
+          `${withheld ? `${unlisted} of the rest ${unlisted === 1 ? "is" : "are"}` : "The rest are"} ` +
+          "counted without being listed: they joined the group in Ghost mode, the roster " +
+          "is capped, or their last report is not fresh. ";
+      }
+      if (undisclosed === undefined) {
+        note +=
+          "PositionGuard did not say how many present members are not disclosed to AI assistants — " +
+          "do not report the named list as complete.";
+      } else if (withheld) {
+        note +=
+          `${undisclosed} present member${undisclosed === 1 ? " is" : "s are"} not disclosed to AI ` +
+          "assistants — do not report the named list as complete.";
+      } else {
+        note += "Report the list as who is confirmed here, not as everyone who is here.";
+      }
+      out.count_note = note;
+    }
   }
   return out;
 }

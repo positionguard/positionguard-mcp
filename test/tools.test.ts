@@ -218,6 +218,9 @@ test("who_is_at_area: only disclosed members; note when the roster had withheld 
     assert.ok(r.undisclosed_note);
     assert.match(r.undisclosed_note!, /^2 members/); // Fred, John
     for (const n of ["Fred", "John"]) assert.ok(!r.undisclosed_note!.includes(n), "note never names anyone");
+    // The counts are 1/0/1: one of the withheld two is inside the area, and
+    // the count says so where member_count alone (1, against 1 listed) was silent.
+    assert.match(r.count_note!, /^2 counted at this area, 1 listed\. 1 present member is not disclosed to AI assistants/);
   }
 });
 
@@ -231,6 +234,10 @@ test("who_is_at_area: no withheld rows -> no note", async () => {
       ),
     ],
   };
+  // Counts to match a roster of Newman alone: the captured 1/0/0. Family's
+  // default counts (1/0/1) put an undisclosed member inside the area, which
+  // count_note reports whether or not the roster has a row for them.
+  routes[`/groups/${FAMILY}/area-counts`] = { status: 200, body: fixture("area_counts.skateboard.ghost.json") };
   const { c } = client(routes);
   const r = await whoIsAtArea(c, { group_id: FAMILY, area_id: SKATEPARK });
   assert.equal(r.status, "ok");
@@ -340,7 +347,8 @@ test("who_is_at_area: public group with the masked member consent-off (captured)
   // Same moment as area_counts.public_group.undisclosed.json: EarlonDev's
   // masked row is now the withheld shape (identity + inside: false), so the
   // mask and the consent gate compose — neither his name nor his presence
-  // is on the wire — while Newman is counted with no row.
+  // is on the wire — while Newman is counted with no row. The counts are
+  // 1/0/1 and the note speaks of both: member_count + undisclosed_count.
   const routes = defaultRoutes();
   routes[`/groups/${PUBLIC}/members`] = { status: 200, body: fixture("members.consent_off.public_group.json") };
   routes[`/groups/${PUBLIC}/area-counts`] = { status: 200, body: fixture("area_counts.public_group.undisclosed.json") };
@@ -350,7 +358,9 @@ test("who_is_at_area: public group with the masked member consent-off (captured)
   if (r.status === "ok") {
     assert.deepEqual(r.members, []);
     assert.match(r.undisclosed_note!, /^1 member /);
-    assert.match(r.count_note!, /^1 counted at this area, none listed\./);
+    assert.match(r.count_note!, /^2 counted at this area, none listed\./);
+    assert.match(r.count_note!, /1 of the rest is counted without being listed/);
+    assert.match(r.count_note!, /1 present member is not disclosed to AI assistants — do not report the named list as complete\.$/);
   }
 });
 

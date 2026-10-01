@@ -76,6 +76,8 @@ async function callAll(client: Client): Promise<void> {
     assert.match(d, /must be relayed with its age .* never as where they are now\./, name);
   }
   assert.match(where.description!, /`since` is when they entered the area/);
+  // The list of areas is what was disclosed, not everything true.
+  assert.match(where.description!, /An area missing from a member's `inside_areas` is not evidence that the member is outside it/);
   assert.match(tools.tools.find((t) => t.name === "count_members_at_area")!.description!, /not recently confirmed/);
   assert.equal(where.annotations?.readOnlyHint, true);
 

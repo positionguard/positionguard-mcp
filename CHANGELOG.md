@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- `where_is_member`: `area` is the innermost area the member is in
+  (`inside_areas[0]` on the wire) and the answer carries `inside_areas`,
+  every area of the group they are disclosed in. An area missing from the
+  list is not evidence the member is outside it, and the tool description
+  says so. `since` is omitted when the area named is not the one the API
+  timed the entry for.
+- `who_is_at_area`: matches the requested area against `inside_areas`, so a
+  member in an inner area is named for the outer one. `count_note` now
+  compares `member_count + undisclosed_count` with the names listed, says
+  how many present members are not disclosed to assistants, and tells the
+  model not to report the list as complete. Before, a member disclosed at
+  an inner area and withheld at the outer one left the outer list short
+  with no note at all.
+- Against a server that doesn't send `inside_areas`, `current_area` answers
+  as before.
+
 ## 0.1.1 — unreleased
 
 - `where_is_member`: a member the server holds at an area through a
